@@ -1,0 +1,21 @@
+competencia_id,nome,categoria,nivel_obrigatorio_minimo,obsoleto_em_anos
+COMP001,Python,Tecnica,2,10
+COMP002,SQL,Tecnica,2,10
+COMP003,Excel,Tecnica,2,8
+COMP004,PowerBI,Tecnica,1,7
+COMP005,Machine Learning,Tecnica,1,6
+COMP006,Deep Learning,Tecnica,0,5
+COMP007,IAGenerativa,Tecnica,0,4
+COMP008,Cloud,Tecnica,0,8
+COMP009,AWS,Tecnica,0,8
+COMP010,Azure,Tecnica,0,8
+COMP011,GCP,Tecnica,0,8
+COMP012,Git,Tecnica,1,10
+COMP013,MLOps,Tecnica,0,5
+COMP014,Mentoria,Comportamental,0,10
+COMP015,Comunicacao,Comportamental,2,10
+COMP016,GestaoProdutos,Gestao,2,8
+COMP017,AnaliseDados,Tecnica,2,8
+COMP018,Recrutamento,Comportamental,2,10
+COMP019,AnaliseFinanceira,Tecnica,2,8
+COMP020,GestaoEquipes,Gestao,2,8

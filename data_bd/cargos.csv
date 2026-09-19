@@ -1,0 +1,16 @@
+cargo_id,titulo,departamento,nivel,competencias_obrigatorias,competencias_desejaveis,salario_minimo,salario_maximo
+C001,Analista de Dados Junior,Dados,Junior,"Python,SQL,Excel","PowerBI,Comunicacao",4000,5500
+C002,Analista de Dados Pleno,Dados,Pleno,"Python,SQL,Excel,PowerBI","Machine Learning,Comunicacao",6000,8000
+C003,Analista de Dados Senior,Dados,Senior,"Python,SQL,Excel,PowerBI,Mentoria","Machine Learning,Deep Learning,IAGenerativa",9000,12000
+C004,Cientista de Dados Junior,Dados,Junior,"Python,SQL,Machine Learning,Excel","Deep Learning,IAGenerativa,Cloud",5000,7000
+C005,Cientista de Dados Pleno,Dados,Pleno,"Python,SQL,Machine Learning,Deep Learning,PowerBI","IAGenerativa,Cloud,MLOps",8000,11000
+C006,Cientista de Dados Senior,Dados,Senior,"Python,SQL,Machine Learning,Deep Learning,Mentoria,PowerBI","IAGenerativa,Cloud,MLOps,GestaoProjetos",12000,16000
+C007,Engenheiro de Software Junior,Tecnologia,Junior,"Python,Git,SQL","Cloud,AWS,Comunicacao",4500,6000
+C008,Engenheiro de Software Pleno,Tecnologia,Pleno,"Python,Git,SQL,Cloud,AWS","AWS,Azure,Comunicacao,GestaoProjetos",7000,9500
+C009,Engenheiro de Software Senior,Tecnologia,Senior,"Python,Git,SQL,Cloud,AWS,Mentoria","AWS,Azure,GCP,Arquitetura,GestaoEquipes",10000,14000
+C010,Gerente de Produto,Produto,Lideranca,"GestaoProdutos,SQL,AnaliseDados,Comunicacao","IAGenerativa,AnaliseDados,Comunicacao",9000,13000
+C011,Analista de RH,RH,Operacional,"Recrutamento,Comunicacao,Excel","PowerBI,AnaliseDados,IAGenerativa",4000,5500
+C012,Analista Financeiro,Financeiro,Operacional,"Excel,SQL,AnaliseFinanceira","PowerBI,Python,AnaliseDados",4500,6500
+C013,Coordenador de Operacoes,Operacoes,Lideranca,"GestaoEquipes,Processos,Excel","SQL,AnaliseDados,PowerBI",8000,12000
+C014,Especialista em IA,Dados,Especialista,"Python,Machine Learning,Deep Learning,IAGenerativa,MLOps","Cloud,MLOps,IAGenerativa,Comunicacao",11000,15000
+C015,Estagiario de Tecnologia,Tecnologia,Estagio,"Python,Git","SQL,Comunicacao",2500,3500

@@ -1,0 +1,26 @@
+treinamento_id,titulo,categoria,competencia_relacionada,duracao_horas,modalidade,custo,certificacao,pre_requisito
+TREIN001,Python Fundamentos,Tecnica,COMP001,20,Online,500,True,
+TREIN002,Python Intermediario,Tecnica,COMP001,30,Online,800,True,TREIN001
+TREIN003,Python Avancado,Tecnica,COMP001,40,Online,1200,True,TREIN002
+TREIN004,SQL para Analise de Dados,Tecnica,COMP002,16,Online,400,True,
+TREIN005,SQL Avancado,Tecnica,COMP002,24,Online,700,True,TREIN004
+TREIN006,Excel para Negocios,Tecnica,COMP003,12,Online,300,True,
+TREIN007,Excel Avancado,Tecnica,COMP003,20,Online,500,True,TREIN006
+TREIN008,PowerBI Essentials,Tecnica,COMP004,16,Online,400,True,
+TREIN009,PowerBI Avancado,Tecnica,COMP004,24,Online,700,True,TREIN008
+TREIN010,Machine Learning Fundamentos,Tecnica,COMP005,30,Online,800,True,TREIN001
+TREIN011,Machine Learning Avancado,Tecnica,COMP005,40,Online,1200,True,TREIN010
+TREIN012,Deep Learning com PyTorch,Tecnica,COMP006,40,Online,1200,True,TREIN010
+TREIN013,Deep Learning com TensorFlow,Tecnica,COMP006,40,Online,1200,True,TREIN010
+TREIN014,IA Generativa na Pratica,Tecnica,COMP007,24,Online,900,True,TREIN001
+TREIN015,Prompt Engineering,Tecnica,COMP007,16,Online,600,True,
+TREIN016,AWS Cloud Practitioner,Cloud,COMP008,20,Online,1000,True,
+TREIN017,AWS Solutions Architect,Cloud,COMP009,30,Online,1500,True,TREIN016
+TREIN018,Azure Fundamentals,Cloud,COMP010,16,Online,1000,True,
+TREIN019,GCP Cloud Engineer,Cloud,COMP011,20,Online,1200,True,TREIN016
+TREIN020,Git e GitHub,Tecnica,COMP012,12,Online,300,True,
+TREIN021,MLOps na Pratica,Tecnica,COMP013,30,Online,1000,True,TREIN010
+TREIN022,Comunicacao Eficaz,Comportamental,COMP015,16,Presencial,400,True,
+TREIN023,Gestao de Projetos,Gestao,COMP016,24,Online,800,True,
+TREIN024,Recrutamento e Selecao,Comportamental,COMP018,20,Presencial,500,True,
+TREIN025,Analise Financeira,Tecnica,COMP019,24,Online,600,True,

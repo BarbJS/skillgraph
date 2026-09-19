@@ -1,0 +1,81 @@
+# SkillGraph — arquivos locais, segredos e artefatos gerados
+
+# Configuração local e segredos
+.env
+.env.local
+.env.production
+.env.development
+!.env.example
+
+# Instalação local do Dify e dados do Docker
+.dify/
+dify/
+volumes/
+
+# Ambientes virtuais e artefatos de empacotamento Python
+.venv/
+venv/
+ENV/
+env/
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.so
+.Python
+*$py.class
+
+# Bancos e estado local
+*.db
+*.duckdb
+*.sqlite
+*.sqlite3
+state/
+
+# Logs e relatórios locais
+logs/
+*.log
+output/
+
+# Modelos e artefatos de Machine Learning
+models/
+etapa2_ml/
+data_bd/dataset_ml.csv
+
+# Arquivos temporários e caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.tmp
+*.swp
+*.swo
+*~
+.ipynb_checkpoints
+
+# Estado local e pacotes de entrega
+logs/skillgraph.jsonl
+state/skillgraph.sqlite
+state/feedback.sqlite
+state/streamlit.sqlite
+dist/zdummy
+dist/skillgraph-etapa1.zip
+dist/skillgraph-etapa1/
+output/evaluation/*.json
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/

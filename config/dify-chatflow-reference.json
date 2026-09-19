@@ -1,0 +1,30 @@
+{
+  "app_name": "SkillGraph — RAG Corporativo — v0.1",
+  "app_type": "chatflow",
+  "published": true,
+  "rag_backend_reference": "Dify Chatflow with its managed vector store (Weaviate in this local deployment); this is the only RAG backend",
+  "local_llm_provider": "LM Studio",
+  "chat_model": "meta-llama-3-8b-instruct",
+  "embedding_model": "text-embedding-nomic-embed-text-v1.5",
+  "knowledge_base": "SkillGraph - v1.2",
+  "retrieval": {
+    "mode": "parent-child",
+    "parent_separator": "\\n\\n",
+    "parent_max_characters": 1024,
+    "child_separator": "\\n",
+    "child_max_characters": 512,
+    "index_mode": "high_quality",
+    "search_mode": "vector",
+    "top_k": 3,
+    "reranker": false,
+    "score_threshold": false
+  },
+  "nodes": [
+    "start",
+    "knowledge-retrieval",
+    "llm",
+    "answer"
+  ],
+  "system_prompt_reference": "../docs/system-prompt.md",
+  "secrets": "API keys are intentionally omitted. Configure them only in the local .env file."
+}
