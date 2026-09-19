@@ -403,6 +403,7 @@ if question:
                 if not answer:
                     raise DifyClientError("O Chatflow do Dify encerrou sem retornar uma resposta.")
                 st.session_state.conversation_id = dify_id
+                placeholder.empty()
                 tools = ["rag:dify"]
             else:
                 raise DifyClientError("Não foi possível encaminhar essa pergunta com segurança.")
