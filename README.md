@@ -136,13 +136,32 @@ O SkillGraph não automatiza promoção, demissão ou qualquer decisão de carre
                ▼                  ▼                  ▼
        Pergunta documental  Indicador/diagnóstico  Conteúdo sensível
                │                  │                  │
-       Dify + Weaviate     DuckDB determinístico   Bloqueio imediato
+               ▼                  ▼                  ▼
+       Dify Chatflow       DuckDB determinístico   Bloqueio imediato
                │                  │
                ▼                  ▼
-       LM Studio local   CSVs relacionais
+          Weaviate       CSVs relacionais
+               │                  │
+               ▼                  ▼
+       Contexto recuperado   Resultado estruturado
+               │                  │
+               ▼                  │
+       LM Studio local            │
+       (resposta gerada)          │
+               │                  │
+               └──────┬───────────┘
+                      ▼
+        Resposta final no Streamlit
+                      │
+                      ▼
+                    Usuário
 
-Pipeline RAG única:
-Streamlit → Dify Chatflow → Weaviate gerenciado → LM Studio
+Pipeline RAG principal:
+Streamlit → Dify Chatflow → Weaviate → contexto recuperado
+                              ↓
+                       LM Studio local
+                              ↓
+               resposta aumentada → Streamlit → Usuário
 
 Infraestrutura Dify:
 Docker Desktop → Dify self-hosted → API/Chatflow/serviços auxiliares
@@ -159,7 +178,9 @@ Docker Desktop → Dify self-hosted → API/Chatflow/serviços auxiliares
 | 🖥️ Streamlit | Entregar a interface, o histórico, os perfis simulados e a integração das camadas. |
 | 🦆 DuckDB | Consultar os CSVs relacionais com rapidez, sem transformar dados tabulares em texto. |
 
-O Dify e o Weaviate formam um único caminho de recuperação: o Dify orquestra o Chatflow e o Weaviate armazena os vetores usados internamente nessa pipeline. Essa decisão evita duplicidade entre bases vetoriais e simplifica a operação e a evolução do sistema.
+O Dify orquestra o Chatflow: recebe a pergunta do Streamlit, consulta o Weaviate, combina o contexto recuperado com a pergunta e chama o modelo de chat do LM Studio. O modelo gera a resposta aumentada, que retorna pelo Dify à API do SkillGraph e é apresentada pelo Streamlit ao usuário. Para perguntas estruturadas, o roteador consulta diretamente o DuckDB e devolve o resultado ao Streamlit sem passar pelo RAG.
+
+O Weaviate armazena e recupera os vetores usados internamente pelo Dify. Essa decisão evita duplicidade entre bases vetoriais e simplifica a operação e a evolução do sistema.
 
 ## 🚀 Como executar em uma máquina nova
 
