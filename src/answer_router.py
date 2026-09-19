@@ -33,7 +33,7 @@ def _dify_client() -> DifyClient:
 
 
 def answer_comparison_question(question: str) -> RoutedAnswer:
-    """Compare values extracted from sources returned by the Dify Chatflow."""
+    """Retrieve evidence for each target, then compare extracted values."""
 
     levels = levels_in_question(question)
     if len(levels) < 2:
@@ -42,8 +42,16 @@ def answer_comparison_question(question: str) -> RoutedAnswer:
             "Informe pelo menos dois níveis de cargo para comparar.",
         )
     try:
-        result = _dify_client().chat(question)
-        extracted = extract_hours(result.sources, levels)
+        client = _dify_client()
+        sources: list[dict[str, Any]] = []
+        for level in levels:
+            retrieval_query = (
+                f"{question}\n"
+                f"Recupere a evidência documental da métrica perguntada para o nível {level}. "
+                "Use a fonte normativa ou a tabela correspondente; não compare nem invente valores."
+            )
+            sources.extend(client.chat(retrieval_query).sources)
+        extracted = extract_hours(sources, levels)
         return RoutedAnswer(
             Intent.COMPARISON,
             extracted.answer,

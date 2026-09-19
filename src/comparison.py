@@ -47,7 +47,7 @@ def extract_hours(chunks: list[Any], requested_levels: list[str]) -> ComparisonR
         source_value = getattr(chunk, "source", None)
         if isinstance(chunk, dict):
             content_value = chunk.get("content", "")
-            source_value = chunk.get("source", "")
+            source_value = chunk.get("source") or chunk.get("document", "")
         content = str(content_value or "")
         source = str(source_value or "")
         for level in requested_levels:

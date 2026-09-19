@@ -23,3 +23,14 @@ def test_extract_hours_is_source_driven():
     assert {row["nível"] for row in result.rows} == {"Sênior", "Pleno"}
     assert "20 horas" in result.answer
     assert result.sources == ("faq.md", "policy.md")
+
+
+def test_extract_hours_uses_document_name_as_source():
+    result = extract_hours(
+        [
+            {"document": "politica_treinamentos.md", "content": "| Júnior | 40 horas |"},
+            {"document": "politica_treinamentos.md", "content": "| Sênior | 60 horas |"},
+        ],
+        ["Júnior", "Sênior"],
+    )
+    assert result.sources == ("politica_treinamentos.md",)
