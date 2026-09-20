@@ -16,11 +16,11 @@ Construir uma aplicação web chamada SkillGraph para a NexaTech, uma empresa fi
 
 A primeira entrega integra Streamlit, Dify, LM Studio, Docker, Weaviate e DuckDB, mantendo respostas baseadas em fontes, consultas determinísticas e revisão humana. Nesta etapa, não foram incluídos agentes Python, Machine Learning, autenticação real ou uma segunda pipeline de RAG.
 
-### Por que esse tema foi escolhido?
+### Por que esse tema foi escolhido? - Justificativas
 
-Neste semestre, decidi explorar um domínio diferente dos que trabalhei anteriormente na disciplina AI Factory. No primeiro semestre, desenvolvi um projeto relacionado ao controle e à garantia da qualidade em linhas de inspeção industrial; no segundo, explorei e-commerce, análise de dados e análise de sentimentos. Agora escolhi Recursos Humanos e aprendizagem corporativa para ampliar meus conhecimentos, minha visão sobre diferentes setores e minhas possibilidades de atuação, aplicando RAG, LLM local, análise de dados e governança em um contexto novo para mim.
+- **Pessoal:** Neste semestre, decidi explorar um domínio diferente dos que trabalhei anteriormente na disciplina AI Factory. No primeiro semestre, desenvolvi um projeto relacionado ao controle e à garantia da qualidade em linhas de inspeção industrial (onde tenho experiência); no segundo, explorei e-commerce, análise de dados e análise de sentimentos (relacionando com o início do meu estágio). E agora escolhi o domínio de Recursos Humanos para aplicar meus conhecimentos, ampliar minha visão sobre as possibilidades de exercício da IA nesta área, e também ampliar minhas possibilidades de atuação com IA nesse novo contexto.
 
-A escolha também se relaciona ao impacto da transformação digital e da inteligência artificial sobre as competências exigidas pelas empresas. À medida que ferramentas e funções mudam, torna-se cada vez mais importante compreender o que cada cargo exige, quais habilidades as equipes já possuem e quais oportunidades de aprendizagem podem apoiar seu desenvolvimento.
+- **Social:** A escolha também se relaciona ao impacto atual e contínuo da transformação digital e da inteligência artificial sobre as competências exigidas pelas empresas. À medida que ferramentas e funções mudam, torna-se cada vez mais importante compreender o que cada cargo exige, quais habilidades as equipes já possuem e quais oportunidades de aprendizagem podem apoiar seu desenvolvimento.
 
 ### Qual é o contexto da NexaTech?
 
