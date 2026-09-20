@@ -16,7 +16,7 @@ O objetivo do SkillGraph é transformar a gestão de competências e a aprendiza
 - **Grande ideia:** usar dados, evidências e IA para apoiar a gestão de competências e a aprendizagem corporativa.
 - **Pergunta essencial:** como uma organização pode identificar lacunas de competências e recomendar trilhas de aprendizagem personalizadas na era da IA generativa?
 - **Desafio:** construir uma aplicação funcional que combine RAG, dados estruturados, interface conversacional, segurança e observabilidade.
-- **Justificativa:** explorar Recursos Humanos e aprendizagem corporativa como um novo domínio de aplicação de RAG, LLM local, análise de dados e governança de IA.
+- **Justificativa:** escolha própria de explorar Recursos Humanos e aprendizagem corporativa como um novo domínio para aplicação de conhecimentos de RAG, LLM local, banco de dados e linguagem natural.
 
 
 > **Assistente de competências e aprendizagem corporativa** para a NexaTech — uma empresa fictícia de tecnologia e serviços.
