@@ -42,7 +42,11 @@ blocked → guardrail, sem ferramenta/LLM
 - O JSONL é local; não há coleta centralizada.
 - Os perfis são simulados, não autenticação real.
 - Para produção, usar armazenamento protegido, retenção definida, controle de acesso e tracing distribuído (por exemplo, Langfuse ou OpenTelemetry).
-- Machine Learning e componentes autônomos não fazem parte desta etapa.
+- A Etapa 1 não inclui a rota de Machine Learning. A observabilidade do ML está documentada e executada separadamente na Etapa 2.
+
+## Machine Learning e etapas
+
+A Etapa 1 observa apenas RAG, SQL, guardrails e streaming. O pipeline ML de competências, suas métricas e seus artefatos pertencem à Etapa 2 e estão documentados em [documentacao-completa-etapa2.md](documentacao-completa-etapa2.md).
 
 ## System prompt
 

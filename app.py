@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from src.resume_extractor import ResumeExtractionError, extract_pdf_text
+from src.agents.runtime import run_agent_flow
 import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
@@ -35,6 +37,8 @@ from src.monitoring import METRICS, record_event
 from src.security import UserRole, evaluate_input
 from src.session_store import SessionStore
 from src.sql_tools import SQLToolError, SkillGraphDatabase
+from src.ml_assistant import LocalMLAssistant, MLAssistantError
+from src.ml_pipeline import ARTIFACT_NAME, global_explanation
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 load_dotenv(PROJECT_ROOT / ".env")
@@ -169,6 +173,48 @@ def _speak(text: str) -> None:
     )
 
 
+def _render_ml_page() -> None:
+    st.header("Desenvolvimento de competências com Machine Learning")
+    st.caption("Recomendação de trilhas para colaboradores informados por analistas e gestores de RH.")
+    st.info("Contexto: classificação multiclasse de trilhas tech. O sistema estima quais trilhas são mais compatíveis com as competências de um colaborador e aponta prioridades de desenvolvimento.")
+    artifact_path = PROJECT_ROOT / ".ml_artifacts" / ARTIFACT_NAME
+    if not artifact_path.exists():
+        st.warning("O modelo de competências ainda não foi preparado. Solicite ao administrador a execução do pipeline da Etapa 2.")
+        return
+    st.subheader("Recomende uma trilha para um colaborador")
+    st.caption("Descreva o colaborador sem nome, CPF, e-mail ou outros identificadores. Ex.: colaborador da equipe de dados.")
+    assistant = LocalMLAssistant(artifact_path)
+    for message in st.session_state.get("ml_messages", []):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    ml_question = st.chat_input(
+        "Ex.: o colaborador tem Python avançado, SQL intermediário e está começando em IA generativa. Qual trilha priorizar?",
+        key="ml-chat-input",
+    )
+    if ml_question:
+        st.session_state.setdefault("ml_messages", []).append({"role": "user", "content": ml_question})
+        with st.chat_message("user"):
+            st.markdown(ml_question)
+        with st.chat_message("assistant"):
+            try:
+                result = assistant.predict_from_question(ml_question)
+                st.markdown(result.answer)
+                if result.recommendations:
+                    st.dataframe(pd.DataFrame(result.recommendations), hide_index=True, use_container_width=True)
+                if role == UserRole.DESENVOLVEDOR.value and result.profile:
+                    with st.expander("Explicabilidade técnica", expanded=False):
+                        structured = result.structured or {}
+                        st.json({"recognized_skills": structured.get("recognized_skills", []), "unrecognized_skills": structured.get("unrecognized_skills", []), "uncertainty": structured.get("uncertainty", {}), "local_explanations": structured.get("local_explanations", []), "recommendations": result.recommendations, "priorities": result.priorities})
+                        try:
+                            st.dataframe(pd.DataFrame(global_explanation(artifact_path)), hide_index=True, use_container_width=True)
+                        except Exception:
+                            st.caption("Importância global indisponível para este artefato.")
+                st.session_state["ml_messages"].append({"role": "assistant", "content": result.answer})
+            except MLAssistantError as exc:
+                st.error(str(exc))
+                st.session_state["ml_messages"].append({"role": "assistant", "content": str(exc)})
+
+
 def _render_manager_chart(frame: pd.DataFrame) -> None:
     """Render a chart without Streamlit's Altair-dependent chart helper."""
 
@@ -276,10 +322,12 @@ with st.sidebar:
     st.session_state.selected_role = role
     if role == UserRole.GESTOR.value:
         gestor_view = st.radio(
-            "Área", ["Chat SkillGraph", "Visão do gestor"], horizontal=True, key="gestor-area"
+            "Área", ["Chat SkillGraph", "Visão do gestor", "Machine Learning"], horizontal=True, key="gestor-area"
         )
     else:
-        gestor_view = "Chat SkillGraph"
+        gestor_view = st.radio(
+            "Área", ["Chat SkillGraph", "Machine Learning"], horizontal=True, key="general-area"
+        )
     _render_sidebar(database, db_error, role)
 
 if "active_conversation_id" not in st.session_state:
@@ -296,6 +344,10 @@ if st.session_state.active_conversation_id not in {item["id"] for item in role_c
         else None
     )
     st.session_state.conversation_id = active.get("dify_conversation_id", "") if active else ""
+
+if gestor_view == "Machine Learning":
+    _render_ml_page()
+    st.stop()
 
 if role == UserRole.GESTOR.value and gestor_view == "Visão do gestor":
     st.header("Visão do gestor")
@@ -319,8 +371,38 @@ if st.session_state.active_conversation_id:
 else:
     st.info("Comece uma conversa sobre políticas, cargos, competências ou trilhas de desenvolvimento.")
 
-question = st.chat_input("Faça uma pergunta sobre desenvolvimento profissional…")
-if question:
+chat_value = st.chat_input(
+    "Faça uma pergunta sobre desenvolvimento profissional…",
+    accept_file="multiple",
+    file_type=["pdf"],
+    max_chars=4000,
+)
+question = chat_value.text if hasattr(chat_value, "text") else chat_value
+uploaded_files = list(getattr(chat_value, "files", []) or []) if chat_value else []
+if question or uploaded_files:
+    if len(uploaded_files) > 1:
+        st.error("Envie apenas um currículo PDF por análise.")
+        st.stop()
+    if uploaded_files:
+        try:
+            import tempfile
+            from src.agents.runtime import run_agent_flow
+            uploaded = uploaded_files[0]
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temporary:
+                temporary.write(uploaded.getvalue())
+                temporary.flush()
+                extracted = extract_pdf_text(Path(temporary.name))
+            agent_result = run_agent_flow(question or "Analise este currículo para desenvolvimento profissional.", resume_text=extracted.text)
+            question = question or "Analisei um currículo para desenvolvimento profissional."
+            if agent_result.get("status") == "completed":
+                st.info(agent_result.get("answer", "Análise multiagente concluída."))
+            else:
+                st.warning(agent_result.get("answer", "O fluxo multiagente está desativado."))
+        except ResumeExtractionError as exc:
+            st.error(str(exc))
+            st.stop()
+    if not question:
+        st.stop()
     request_id = str(uuid.uuid4())
     started = time.perf_counter()
     decision = evaluate_input(question, UserRole(role))

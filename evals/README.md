@@ -1,5 +1,14 @@
 # Golden dataset do SkillGraph
 
+O golden dataset documenta e avalia somente as rotas da Etapa 1. O pipeline de Machine Learning pertence à Etapa 2; seus critérios estão em `docs/documentacao-completa-etapa2.md` e `docs/evaluation-ml.md`.
+
+Para executar somente os testes da Etapa 1:
+
+```bash
+pytest -q tests/test_golden_dataset.py tests/test_intent_router.py tests/test_security.py tests/test_sql_tools.py
+```
+
+
 O arquivo `golden_dataset.jsonl` contém 18 casos versionados para avaliar as rotas do SkillGraph antes da demonstração.
 
 ## Categorias
@@ -46,4 +55,4 @@ O RAG do Dify continua sendo validado com o serviço local publicado e não é c
 - Consultas SQL devem retornar dados agregados ou consultas explicitamente solicitadas, sem expor linhas pessoais indevidas.
 - Consultas de competência devem descrever apenas os campos relacionais disponíveis, sem previsão ou classificação.
 - RAG deve citar documentos somente quando houver evidência.
-- Machine Learning e componentes autônomos não são avaliados nesta etapa.
+- O Machine Learning de competências não pertence ao golden dataset da Etapa 1; consulte a documentação da Etapa 2.

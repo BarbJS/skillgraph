@@ -14,6 +14,7 @@ volumes/
 
 # Ambientes virtuais e artefatos de empacotamento Python
 .venv/
+.crew-venv/
 venv/
 ENV/
 env/
@@ -50,6 +51,10 @@ output/
 models/
 etapa2_ml/
 data_bd/dataset_ml.csv
+.flaml/
+.ml_artifacts/
+# Legacy productivity model is invalid for the competency workflow.
+.ml_artifacts/skillgraph_productivity.pkl
 
 # Arquivos temporários e caches
 __pycache__/
@@ -58,6 +63,7 @@ __pycache__/
 .coverage
 htmlcov/
 *.tmp
+.ml_artifacts/resume-upload.pdf
 *.swp
 *.swo
 *~

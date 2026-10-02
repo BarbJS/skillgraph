@@ -32,7 +32,8 @@ class SessionStore:
                     backend TEXT NOT NULL DEFAULT 'dify',
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    role TEXT NOT NULL DEFAULT 'desenvolvedor'
+                    role TEXT NOT NULL DEFAULT 'desenvolvedor',
+                    agent_state_json TEXT NOT NULL DEFAULT '{}'
                 );
                 CREATE TABLE IF NOT EXISTS messages (
                     id TEXT PRIMARY KEY,
@@ -51,6 +52,8 @@ class SessionStore:
             columns = {row[1] for row in db.execute("PRAGMA table_info(conversations)").fetchall()}
             if "role" not in columns:
                 db.execute("ALTER TABLE conversations ADD COLUMN role TEXT NOT NULL DEFAULT 'desenvolvedor'")
+            if "agent_state_json" not in columns:
+                db.execute("ALTER TABLE conversations ADD COLUMN agent_state_json TEXT NOT NULL DEFAULT '{}'")
 
     @staticmethod
     def _now() -> str:
@@ -103,6 +106,22 @@ class SessionStore:
                 params,
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def agent_state(self, conversation_id: str, role: str | None = None) -> dict[str, Any]:
+        conversation = self.get_conversation(conversation_id, role)
+        if not conversation:
+            return {}
+        try:
+            state = json.loads(conversation.get("agent_state_json", "{}"))
+        except json.JSONDecodeError:
+            return {}
+        return state if isinstance(state, dict) else {}
+
+    def update_agent_state(self, conversation_id: str, state: dict[str, Any], role: str | None = None) -> None:
+        if not self.get_conversation(conversation_id, role):
+            raise ValueError("Conversa não encontrada para este perfil.")
+        with self._connect() as db:
+            db.execute("UPDATE conversations SET agent_state_json=?, updated_at=? WHERE id=?", (json.dumps(state, ensure_ascii=False), self._now(), conversation_id))
 
     def add_message(self, conversation_id: str, role: str, content: str, *, route: str = "", request_id: str = "", sources: list[dict[str, str]] | None = None, conversation_role: str | None = None) -> str:
         if not self.get_conversation(conversation_id, conversation_role):

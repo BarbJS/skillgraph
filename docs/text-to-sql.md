@@ -19,7 +19,7 @@ O usuário não precisa conhecer SQL. As consultas permitidas são implementadas
 
 ### Limitação importante
 
-Os dados atuais não possuem uma tabela mestre confiável que relacione cada funcionário a um departamento. Por isso, o sistema não inventa um indicador “por departamento” usando o dataset reservado para a Etapa 2. Essa relação poderá ser adicionada em uma etapa posterior com uma fonte estruturada documentada.
+Os dados atuais não possuem uma tabela mestre confiável que relacione cada funcionário a um departamento. Por isso, o sistema não inventa um indicador “por departamento” usando o dados do pipeline ML de competências, que permanecem fora do DuckDB. Essa relação poderá ser adicionada em uma etapa posterior com uma fonte estruturada documentada.
 
 ### Evolução futura
 

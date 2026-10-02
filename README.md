@@ -64,7 +64,8 @@ O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura fun
 
 | Se você quer... | Comece por... |
 | --- | --- |
-| Entender o desenvolvimento completo | 📖 [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md) |
+| Entender a Etapa 1 | 📖 [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md) |
+| Entender a Etapa 2 de ML | 📖 [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md) |
 | Executar o projeto localmente | 🚀 [Como executar em uma máquina nova](#-como-executar-em-uma-máquina-nova) |
 | Configurar Dify e LM Studio | 🧩 [Configuração do LM Studio no Dify](docs/model-setup.md) |
 | Entender o RAG | 📚 [Pipeline Dify + Weaviate](#-arquitetura-em-uma-visão) |
@@ -91,17 +92,18 @@ O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura fun
 - 🧑‍💼 Experiências simuladas para desenvolvedor, gestor e RH.
 - 🧪 Testes automatizados e dataset dourado para avaliar o roteamento.
 
-## 📌 Estado atual da entrega
+## 📌 Estado atual da Etapa 1
 
 | Área | Situação |
 | --- | --- |
 | Interface conversacional | ✅ Streamlit com histórico, streaming, fontes e feedback |
 | RAG | ✅ Dify Chatflow + Weaviate gerenciado pelo Dify |
+| ML de competências (Etapa 2) | ✅ O*NET 31.0 + FLAML, com recomendações para colaboradores descritos por RH |
 | System prompt | ✅ Contextualizado para RH e aprendizagem corporativa |
 | Dados estruturados | ✅ DuckDB sobre cinco CSVs sintéticos |
 | Segurança | ✅ Guardrails para PII, prompt injection e SQL destrutivo |
 | Observabilidade | ✅ Métricas locais e logs minimizados |
-| Machine Learning | 🧭 Reservado para a Etapa 2 |
+| Machine Learning | ✅ Recomendação de trilhas e competências com FLAML + O*NET |
 | Autenticação real | 🧭 Fora do escopo do MVP |
 
 ## 🎯 Problema de negócio
@@ -250,7 +252,6 @@ No host, o LM Studio normalmente responde em `http://127.0.0.1:1234/v1`. Dentro 
 ### 4. Instalar as dependências Python
 
 ```bash
-python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -266,6 +267,8 @@ streamlit run app.py
 ```
 
 A aplicação normalmente ficará disponível em `http://localhost:8501`. A chave da API do Dify é utilizada pelo processo Python e não é enviada ao navegador.
+
+A Etapa 2 de Machine Learning possui execução e documentação próprias em [docs/documentacao-completa-etapa2.md](docs/documentacao-completa-etapa2.md). Para preparar o artefato da Etapa 2, execute `make bootstrap-flaml` e `make train-ml` conforme o guia específico.
 
 ## 📚 Pipeline RAG com Dify e Weaviate
 
@@ -364,6 +367,21 @@ Depois de configurar o ambiente seguindo o quickstart, outras pessoas podem expl
 
 Antes de propor mudanças no Chatflow, recomenda-se testar as perguntas do dataset dourado, conferir a fidelidade das fontes, verificar a ausência de evidência e registrar impactos de latência. Alterações de código devem ser acompanhadas por testes e manter a separação entre RAG documental e dados estruturados.
 
+## 🧠 Etapa 2 — Machine Learning de competências
+
+A documentação completa, o planejamento, o treinamento FLAML e a integração do modelo pertencem à Etapa 2. Consulte [docs/documentacao-completa-etapa2.md](docs/documentacao-completa-etapa2.md).
+
+```text
+Descrição não identificadora do colaborador
+  → LM Studio estrutura competências em JSON
+  → backend valida níveis e PII
+  → skillgraph_competency_tracks.pkl
+  → trilhas Top-3 e prioridades
+  → LM Studio explica o resultado
+```
+
+Guias técnicos: [docs/ml-traditional.md](docs/ml-traditional.md), [docs/ml-llm-integration.md](docs/ml-llm-integration.md) e [docs/evaluation-ml.md](docs/evaluation-ml.md).
+
 ## 🧪 Testes e avaliação
 
 Com o ambiente virtual ativado e as dependências instaladas:
@@ -394,7 +412,7 @@ make status         # containers do Dify
 - Os perfis de desenvolvedor, gestor e RH são simulações; ainda não existe login ou RBAC real.
 - A base não possui uma tabela-mestre completa de funcionários com nome, cargo, gestor e departamento.
 - As faixas salariais representam cargos e não autorizam inferências sobre salário individual.
-- O classificador preditivo de Machine Learning pertence à Etapa 2 e não é usado para decisões nesta entrega.
+- A área de Machine Learning usa O*NET/FLAML para apoiar recomendações de trilhas de desenvolvimento, não usa as tabelas da Etapa 1 e não deve apoiar decisões automáticas de RH.
 
 Nunca use o comando abaixo em testes normais, pois ele remove volumes e dados locais do Dify:
 
@@ -404,7 +422,7 @@ docker compose down -v
 
 ## 🧩 Limitações conhecidas e próximos passos
 
-O SkillGraph é um MVP acadêmico funcional. Antes de um uso real, seria necessário implementar autenticação corporativa, autorização por perfil, política de retenção, armazenamento protegido, observabilidade centralizada, revisão humana formal e testes de carga. Também estão planejados o classificador de risco da Etapa 2, uma possível tabela organizacional mais completa, integração com ferramentas corporativas e evolução da busca híbrida.
+O SkillGraph é um MVP acadêmico funcional. Antes de um uso real, seria necessário implementar autenticação corporativa, autorização por perfil, política de retenção, armazenamento protegido, observabilidade centralizada, revisão humana formal e testes de carga. Também estão planejados uma tabela organizacional mais completa, integração com ferramentas corporativas, evolução da busca híbrida e ampliação do catálogo de competências de IA generativa.
 
 ## 📚 Documentação e leitura adicional
 
@@ -419,6 +437,13 @@ Esse documento reúne a explicação aprofundada que acompanha esta entrega e se
 ### 🧰 Guias operacionais
 
 - [Configuração do LM Studio no Dify](docs/model-setup.md)
+- [Machine Learning de competências](docs/ml-traditional.md)
+- [Integração LLM → PKL de competências](docs/ml-llm-integration.md)
+- [Avaliação do modelo ML](docs/evaluation-ml.md)
+- [XAI da Etapa 2](docs/xai-ml.md)
+- [CrewAI e sistema multiagente](docs/agents-crewai.md)
+- [Fluxos de conversa multiagente](docs/agent-flows.md)
+- [Fluxos de conversa multiagente](docs/agent-flows.md)
 - [Arquitetura e decisões de RAG](docs/rag-architecture-decisions.md)
 - [System prompt contextualizado](docs/system-prompt.md)
 - [Text-to-SQL seguro](docs/text-to-sql.md)
@@ -430,4 +455,4 @@ Este é um projeto em desenvolvimento na disciplina **AI Factory: Building Intel
 
 O projeto responde à pergunta: **como uma organização pode identificar lacunas de competências e recomendar trilhas de aprendizagem personalizadas na era da IA generativa?** A solução combina recuperação fundamentada em documentos, análise determinística de dados estruturados, um system prompt contextualizado e uma experiência conversacional orientada por transparência.
 
-A camada preditiva, o deploy público e as integrações corporativas permanecem como evolução posterior. O foco desta entrega é demonstrar uma base local, funcional, explicável e reproduzível para apoiar o desenvolvimento profissional com responsabilidade.
+O deploy público e as integrações corporativas permanecem como evolução posterior. A entrega demonstra uma base local, funcional, explicável e reproduzível para apoiar o desenvolvimento profissional com responsabilidade, incluindo a recomendação ML de trilhas baseada no O*NET.

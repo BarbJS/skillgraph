@@ -77,7 +77,7 @@ def answer_structured_question(
         answer = "Este é o catálogo de treinamentos disponível nos dados estruturados."
     else:
         rows = database.competency_gaps()
-        reason = "Lacunas calculadas diretamente nas tabelas funcionario_competencia e competencias."
+        reason = "Lacunas calculadas diretamente no DuckDB, nas tabelas funcionario_competencia e competencias."
         answer = "Este é o resumo das maiores lacunas encontrado nos dados estruturados."
     return RoutedAnswer(Intent.SQL_INDICATOR, answer, rows, reason)
 

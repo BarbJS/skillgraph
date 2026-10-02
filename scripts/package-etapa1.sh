@@ -20,7 +20,11 @@ for path in README.md Makefile pytest.ini requirements.txt env.example .gitignor
   copy_if_exists "${path}"
 done
 
-rm -rf "${STAGE}/.env" "${STAGE}/.dify" "${STAGE}/models" "${STAGE}/etapa2_ml" "${STAGE}/data_bd/dataset_ml.csv" "${STAGE}/scripts/train-ml.sh" "${STAGE}/src/ml_model.py" "${STAGE}/src/train_model.py" "${STAGE}/tests/test_ml_model.py"
+rm -rf "${STAGE}/.env" "${STAGE}/.dify" "${STAGE}/.flaml" "${STAGE}/.ml_artifacts" "${STAGE}/models" "${STAGE}/etapa2_ml" "${STAGE}/data_bd/dataset_ml.csv" "${STAGE}/scripts/train-ml.sh" "${STAGE}/src/ml_model.py" "${STAGE}/src/train_model.py" "${STAGE}/tests/test_ml_model.py"
+
+# Keep the reproducible bootstrap/training code and documentation, but never package
+# downloaded O*NET data or generated PKL/report artifacts.
+rm -rf "${STAGE}/.ml_artifacts" "${STAGE}/.flaml"
 find "${STAGE}" -type d -name '__pycache__' -prune -exec rm -rf {} +
 find "${STAGE}" -type f -name '.DS_Store' -delete
 

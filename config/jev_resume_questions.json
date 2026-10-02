@@ -1,0 +1,56 @@
+{
+  "years_of_experience": {
+    "type": "score",
+    "instructions": "How many years of professional technical experience does the resume demonstrate? Use only explicit evidence.",
+    "criteria": ["None", "2 years", "4 years", "6 years", "8 years", "10+ years"]
+  },
+  "technical_depth": {
+    "type": "score",
+    "instructions": "Rate hands-on engineering depth using personally owned project evidence. Ignore job titles and keyword lists.",
+    "criteria": [
+      "No technical evidence",
+      "Initial or academic exposure",
+      "Small independent implementation",
+      "Independent production contribution",
+      "Owns systems and architecture decisions",
+      "Deep specialist with broad technical ownership"
+    ]
+  },
+  "mentorship_demonstrated": {
+    "type": "noul",
+    "instructions": "Does the resume explicitly demonstrate mentoring, technical leadership, or teaching other engineers?"
+  },
+  "llm_experience": {
+    "type": "noul",
+    "instructions": "Does the resume explicitly demonstrate building or operating products using large language models or generative AI?"
+  },
+  "open_source_experience": {
+    "type": "noul",
+    "instructions": "Does the resume explicitly demonstrate open-source contributions or maintenance?"
+  },
+  "primary_talent_profile": {
+    "type": "choice",
+    "instructions": "Which primary technical profile is best supported by the resume evidence? Do not infer from job title alone.",
+    "criteria": {
+      "frontend_engineer": "Builds user-facing interfaces and frontend systems",
+      "backend_engineer": "Builds server-side services, APIs, data models, and backend systems",
+      "full_stack_engineer": "Owns both user-facing interfaces and backend services",
+      "devops_infrastructure": "Owns CI/CD, cloud infrastructure, reliability, or platform systems",
+      "data_engineer": "Builds data pipelines, warehouses, and data platforms",
+      "ml_ai_engineer": "Builds, evaluates, or serves Machine Learning or AI systems",
+      "security_engineer": "Works on application, cloud, infrastructure, or product security",
+      "other": "Technical profile does not fit the listed categories",
+      "unclear": "The resume does not provide enough evidence"
+    }
+  },
+  "career_progression": {
+    "type": "choice",
+    "instructions": "What career progression pattern is explicitly shown by the resume?",
+    "criteria": {
+      "steady_growth": "Clear progression with increasing responsibility",
+      "lateral_moves": "Similar technical roles across different organizations",
+      "job_hopping": "Frequent short-tenure changes",
+      "unclear": "Progression cannot be determined from the evidence"
+    }
+  }
+}
