@@ -6,7 +6,10 @@ FLAML_DIR="${ROOT}/.flaml"
 FLAML_VERSION="${FLAML_VERSION:-v2.7.0}"
 
 command -v git >/dev/null 2>&1 || { printf 'Comando obrigatório não encontrado: git\n' >&2; exit 1; }
-command -v python3 >/dev/null 2>&1 || { printf 'Comando obrigatório não encontrado: python3\n' >&2; exit 1; }
+[[ -x "${ROOT}/.venv/bin/python" ]] || { printf 'Ambiente oficial ausente. Execute make bootstrap-crewai primeiro.\n' >&2; exit 1; }
+version="$(${ROOT}/.venv/bin/python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+[[ "${version}" == "3.11" ]] || { printf 'O ambiente oficial precisa usar Python 3.11; encontrado %s.\n' "${version}" >&2; exit 1; }
+PYTHON_BIN="${ROOT}/.venv/bin/python"
 
 if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && ! brew list --formula libomp >/dev/null 2>&1; then
   printf '[INFO] Instalando libomp para os estimadores FLAML no macOS\n'
@@ -30,7 +33,7 @@ else
   printf '[INFO] Checkout FLAML %s já existe\n' "${FLAML_VERSION}"
 fi
 
-printf '[INFO] Instalando FLAML e dependências do projeto no ambiente Python ativo\n'
-python3 -m pip install -r "${ROOT}/requirements.txt"
-python3 -m pip install -e "${FLAML_DIR}[automl]"
+printf '[INFO] Instalando FLAML e dependências no ambiente oficial Python 3.11\n'
+"${PYTHON_BIN}" -m pip install -r "${ROOT}/requirements.txt"
+"${PYTHON_BIN}" -m pip install -e "${FLAML_DIR}[automl]"
 printf '[INFO] Bootstrap do FLAML concluído\n'

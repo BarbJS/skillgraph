@@ -1,6 +1,6 @@
 # Etapa 2 — Avaliação do ML de competências
 
-O modelo é uma classificação multiclasse de trilhas tech para colaboradores descritos por analistas e gestores de RH.
+O modelo é uma classificação multiclasse de trilhas tech para colaboradores descritos por analistas e gestores de RH. O painel técnico do perfil Desenvolvedor também exibe as métricas reais de validação e teste, incluindo alerta quando há queda significativa de generalização.
 
 ## Métricas
 
@@ -10,6 +10,10 @@ O modelo é uma classificação multiclasse de trilhas tech para colaboradores d
 - Top-2 accuracy: útil quando trilhas próximas são alternativas plausíveis.
 - Matriz de confusão: mostra confusões entre trilhas.
 - ROC-AUC OvR: somente quando há suporte suficiente para todas as classes.
+
+## Viés e fairness
+
+O pipeline calcula métricas por trilha, suporte, precision, recall, F1 e gap máximo de recall. Fairness entre grupos protegidos só é avaliada quando atributos autorizados e consentidos existirem; não são inferidos nem usados proxies do O*NET ocupacional. Sem grupos, o relatório declara `not_evaluable_without_authorized_group_attributes` em vez de afirmar ausência de viés. Suporte insuficiente e gap acima do threshold geram alerta para revisão humana.
 
 ## Limitações
 

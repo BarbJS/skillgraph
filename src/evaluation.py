@@ -16,7 +16,11 @@ REPORT_PATH = ROOT / "output" / "evaluation" / "deterministic_report.json"
 
 
 def load_cases() -> list[dict]:
-    return [json.loads(line) for line in GOLDEN_PATH.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in GOLDEN_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def run() -> dict:
@@ -35,12 +39,25 @@ def run() -> dict:
                 routed = answer_structured_question(case["question"], database)
                 answer = routed.answer
                 passed = passed and bool(routed.rows)
-            results.append({"id": case["id"], "route": route.intent.value, "passed": passed, "answer_preview": answer[:240]})
+            results.append(
+                {
+                    "id": case["id"],
+                    "route": route.intent.value,
+                    "passed": passed,
+                    "answer_preview": answer[:240],
+                }
+            )
     finally:
         database.close()
-    report = {"total": len(results), "passed": sum(item["passed"] for item in results), "results": results}
+    report = {
+        "total": len(results),
+        "passed": sum(item["passed"] for item in results),
+        "results": results,
+    }
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    REPORT_PATH.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return report
 
 

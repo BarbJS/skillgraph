@@ -9,7 +9,9 @@ DATA_DIR = ROOT / "data_bd"
 
 
 def test_routes_competency_lookup():
-    route = route_question("Qual é a situação da competência COMP003 do funcionário F0001?")
+    route = route_question(
+        "Qual é a situação da competência COMP003 do funcionário F0001?"
+    )
     assert route.intent is Intent.COMPETENCY_LOOKUP
     assert extract_case_ids("F0001 COMP003") == ("F0001", "COMP003")
 
@@ -17,7 +19,9 @@ def test_routes_competency_lookup():
 def test_competency_answer_uses_relational_data():
     db = SkillGraphDatabase(DATA_DIR)
     try:
-        answer = answer_competency_question("Qual é a situação da competência COMP003 do funcionário F0001?", db)
+        answer = answer_competency_question(
+            "Qual é a situação da competência COMP003 do funcionário F0001?", db
+        )
         assert answer.route is Intent.COMPETENCY_LOOKUP
         assert "Nível atual" in answer.answer
     finally:
@@ -29,7 +33,10 @@ def test_routes_document_questions_to_rag():
 
 
 def test_routes_aggregate_questions_to_sql():
-    assert route_question("Quais competências têm mais lacunas?").intent is Intent.SQL_INDICATOR
+    assert (
+        route_question("Quais competências têm mais lacunas?").intent
+        is Intent.SQL_INDICATOR
+    )
 
 
 def test_blocks_sensitive_requests():

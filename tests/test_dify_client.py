@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
 
 import pytest
-import requests
 
 from src.dify_client import DifyClient, DifyClientError
 
@@ -38,15 +36,15 @@ class FakeSession:
 
 def test_stream_chat_parses_dify_events_without_logging_key():
     events = [
-        'event: message',
+        "event: message",
         'data: {"answer":"60 horas ","conversation_id":"c1"}',
-        '',
-        'event: message',
+        "",
+        "event: message",
         'data: {"answer":"por ano."}',
-        '',
-        'event: message_end',
+        "",
+        "event: message_end",
         'data: {"message_id":"m1","conversation_id":"c1"}',
-        '',
+        "",
     ]
     session = FakeSession(FakeResponse(events))
     client = DifyClient("http://localhost", "secret-key", "user", session=session)

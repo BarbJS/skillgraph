@@ -20,10 +20,15 @@ class ComparisonResult:
 
 
 _LEVEL_ALIASES = {
-    "estagio": "Estágio", "estágio": "Estágio",
-    "junior": "Júnior", "júnior": "Júnior",
-    "pleno": "Pleno", "senior": "Sênior", "sênior": "Sênior",
-    "lideranca": "Liderança", "liderança": "Liderança",
+    "estagio": "Estágio",
+    "estágio": "Estágio",
+    "junior": "Júnior",
+    "júnior": "Júnior",
+    "pleno": "Pleno",
+    "senior": "Sênior",
+    "sênior": "Sênior",
+    "lideranca": "Liderança",
+    "liderança": "Liderança",
     "especialista": "Especialista",
 }
 
@@ -63,16 +68,29 @@ def extract_hours(chunks: list[Any], requested_levels: list[str]) -> ComparisonR
                     sources.add(source)
                     break
 
-    rows = [{"nível": level, "carga mínima anual (horas)": values[level]} for level in requested_levels if level in values]
+    rows = [
+        {"nível": level, "carga mínima anual (horas)": values[level]}
+        for level in requested_levels
+        if level in values
+    ]
     if len(rows) < 2:
         return ComparisonResult(
             "Não encontrei evidências suficientes nos documentos para comparar os níveis solicitados.",
-            rows, tuple(sorted(sources)), "Foram recuperados documentos, mas não foi possível extrair os dois valores solicitados.",
+            rows,
+            tuple(sorted(sources)),
+            "Foram recuperados documentos, mas não foi possível extrair os dois valores solicitados.",
         )
     low = min(row["carga mínima anual (horas)"] for row in rows)
     high = max(row["carga mínima anual (horas)"] for row in rows)
     difference = high - low
     percentage = (difference / low * 100) if low else 0
-    ordered = ", ".join(f"{row['nível']}: {row['carga mínima anual (horas)']} horas" for row in rows)
+    ordered = ", ".join(
+        f"{row['nível']}: {row['carga mínima anual (horas)']} horas" for row in rows
+    )
     answer = f"**Comparação**\n\n{ordered}.\n\nA diferença entre o maior e o menor valor é de **{difference} horas por ano** ({percentage:.0f}% em relação ao menor valor)."
-    return ComparisonResult(answer, rows, tuple(sorted(sources)), "Valores extraídos dos trechos recuperados; a diferença foi calculada automaticamente.")
+    return ComparisonResult(
+        answer,
+        rows,
+        tuple(sorted(sources)),
+        "Valores extraídos dos trechos recuperados; a diferença foi calculada automaticamente.",
+    )

@@ -20,12 +20,17 @@ def _positive_class_index(model: Any, track: str) -> int:
         return 0
 
 
-def local_tree_explanation(model: Any, matrix: np.ndarray, feature_names: list[str], track: str, top_k: int = 8) -> list[dict[str, Any]]:
+def local_tree_explanation(
+    model: Any, matrix: np.ndarray, feature_names: list[str], track: str, top_k: int = 8
+) -> list[dict[str, Any]]:
     """Return local feature contributions for tree models, with safe fallback."""
 
     if shap is None or not hasattr(model, "estimator"):
         return []
-    estimator = model.estimator
+    estimator = getattr(model, "estimator", model)
+    estimator = getattr(estimator, "_model", estimator)
+    if not hasattr(estimator, "predict"):
+        return []
     try:
         explainer = shap.TreeExplainer(estimator)
         values = explainer.shap_values(matrix)
@@ -51,12 +56,22 @@ def local_tree_explanation(model: Any, matrix: np.ndarray, feature_names: list[s
         return []
 
 
-def global_tree_importance(model: Any, feature_names: list[str], top_k: int = 15) -> list[dict[str, Any]]:
+def global_tree_importance(
+    model: Any, feature_names: list[str], top_k: int = 15
+) -> list[dict[str, Any]]:
     """Return global tree importances for the developer-only panel."""
 
     estimator = getattr(model, "estimator", model)
     importances = getattr(estimator, "feature_importances_", None)
     if importances is None:
+        importances = getattr(
+            getattr(estimator, "_model", None), "feature_importances_", None
+        )
+    if importances is None:
         return []
     order = np.argsort(np.asarray(importances))[::-1][:top_k]
-    return [{"feature": feature_names[index], "importance": float(importances[index])} for index in order if float(importances[index]) > 0]
+    return [
+        {"feature": feature_names[index], "importance": float(importances[index])}
+        for index in order
+        if float(importances[index]) > 0
+    ]

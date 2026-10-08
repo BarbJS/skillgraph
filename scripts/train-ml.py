@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Train the SkillGraph collaborator competency-track model with FLAML."""
 
+
 from __future__ import annotations
 
 import argparse
@@ -37,26 +38,74 @@ def main() -> None:
     parser.add_argument("--tuning-budget", type=int, default=45)
     parser.add_argument("--seed", type=int, default=SEED)
     parser.add_argument("--cache-dir", type=Path, default=Path(".ml_artifacts/onet"))
-    parser.add_argument("--artifact", type=Path, default=Path(f".ml_artifacts/{ARTIFACT_NAME}"))
-    parser.add_argument("--report", type=Path, default=Path(".ml_artifacts/competency_report.json"))
+    parser.add_argument(
+        "--artifact", type=Path, default=Path(f".ml_artifacts/{ARTIFACT_NAME}")
+    )
+    parser.add_argument(
+        "--report", type=Path, default=Path(".ml_artifacts/competency_report.json")
+    )
     args = parser.parse_args()
-
+    if tuple(sys.version_info[:2]) != (3, 11):
+        raise SystemExit(
+            "O treinamento deve ser executado no ambiente oficial Python 3.11 (.venv)."
+        )
     root = fetch_onet_dataset(args.cache_dir)
     frame, metadata = build_training_frame(root)
     split = split_dataset(frame, seed=args.seed)
-    preprocessor, results, _ = train_compare(split, metadata["feature_names"], time_budget=args.time_budget, seed=args.seed)
+    preprocessor, results, _ = train_compare(
+        split, metadata["feature_names"], time_budget=args.time_budget, seed=args.seed
+    )
     selected = choose_model(results)
-    tuned_preprocessor, tuned = fine_tune(split, selected, metadata["feature_names"], time_budget=args.tuning_budget, seed=args.seed)
-    final_preprocessor, final, test_metrics = fit_final_and_test(split, tuned, metadata["feature_names"], seed=args.seed)
-    track_profiles = build_track_profiles(pd.concat([split.train, split.validation], ignore_index=True), metadata["feature_names"])
-    save_artifact(args.artifact, final_preprocessor, final, metadata, track_profiles, seed=args.seed)
+    tuned_preprocessor, tuned = fine_tune(
+        split,
+        selected,
+        metadata["feature_names"],
+        time_budget=args.tuning_budget,
+        seed=args.seed,
+    )
+    final_preprocessor, final, test_metrics = fit_final_and_test(
+        split, tuned, metadata["feature_names"], seed=args.seed
+    )
+    track_profiles = build_track_profiles(
+        pd.concat([split.train, split.validation], ignore_index=True),
+        metadata["feature_names"],
+    )
+    save_artifact(
+        args.artifact,
+        final_preprocessor,
+        final,
+        metadata,
+        track_profiles,
+        seed=args.seed,
+    )
     report = {
         "problem": "classificação multiclasse de trilhas de desenvolvimento tech para colaboradores descritos por RH",
-        "dataset": metadata | {"profile": profile_dataset(frame), "split_sizes": {"train": len(split.train), "validation": len(split.validation), "test": len(split.test)}},
+        "dataset": metadata
+        | {
+            "profile": profile_dataset(frame),
+            "split_sizes": {
+                "train": len(split.train),
+                "validation": len(split.validation),
+                "test": len(split.test),
+            },
+        },
         "seed": args.seed,
-        "validation_results": [{"name": item.name, "family": item.family, "metrics": item.validation.__dict__, "config": item.config, "error": item.error} for item in results],
+        "validation_results": [
+            {
+                "name": item.name,
+                "family": item.family,
+                "metrics": item.validation.__dict__,
+                "config": item.config,
+                "error": item.error,
+            }
+            for item in results
+        ],
         "selected": selected.name,
-        "tuned": {"name": tuned.name, "metrics": tuned.validation.__dict__, "config": tuned.config},
+        "tuned": {
+            "name": tuned.name,
+            "metrics": tuned.validation.__dict__,
+            "config": tuned.config,
+        },
         "test": test_metrics.__dict__,
         "artifact": str(args.artifact),
     }

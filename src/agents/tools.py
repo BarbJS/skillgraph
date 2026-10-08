@@ -19,11 +19,15 @@ class AgentToolError(RuntimeError):
     pass
 
 
-def competency_recommendation_tool(artifact_path: Path, skills: dict[str, float]) -> dict[str, Any]:
+def competency_recommendation_tool(
+    artifact_path: Path, skills: dict[str, float]
+) -> dict[str, Any]:
     return recommend_from_profile(artifact_path, skills)
 
 
-def training_catalog_tool(database: SkillGraphDatabase, competency: str | None = None) -> list[dict[str, Any]]:
+def training_catalog_tool(
+    database: SkillGraphDatabase, competency: str | None = None
+) -> list[dict[str, Any]]:
     return database.training_catalog(competency=competency)
 
 
@@ -32,6 +36,8 @@ def policy_rag_tool(client: DifyClient, question: str) -> list[dict[str, Any]]:
     return result.sources
 
 
-def jev_resume_tool(client: JevClient, state: dict[str, Any], questions: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def jev_resume_tool(
+    client: JevClient, state: dict[str, Any], questions: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
     result = client.analyze(state, questions)
     return {"model": result.model, "answers": result.answers, "usage": result.usage}

@@ -1,8 +1,12 @@
-from pathlib import Path
-
 import pytest
 
 from src.resume_extractor import ResumeExtractionError, extract_pdf_text
+
+
+def test_ocr_module_exists():
+    from src.ocr import ocr_pdf_text
+
+    assert callable(ocr_pdf_text)
 
 
 def test_non_pdf_is_rejected(tmp_path):

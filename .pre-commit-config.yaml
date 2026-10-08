@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(.dify|.flaml|.venv|.venv-py314-backup|.crew-venv|.ml_artifacts|state|logs|output)/
+      - id: end-of-file-fixer
+        exclude: ^(.dify|.flaml|.venv|.venv-py314-backup|.crew-venv|.ml_artifacts|state|logs|output)/
+      - id: check-merge-conflict
+      - id: check-ast
+        files: \.py$
+      - id: check-json
+        files: \.json$
+      - id: check-yaml
+        files: \.(yaml|yml)$
+      - id: detect-private-key
+
+  - repo: https://github.com/psf/black-pre-commit-mirror
+    rev: 25.9.0
+    hooks:
+      - id: black
+        language_version: python3.11
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.0
+    hooks:
+      - id: ruff-check
+        args: [--output-format=concise, --ignore=E402]
+        files: \.py$
+        exclude: ^(\.dify|\.flaml|\.venv|\.venv-py314-backup|\.crew-venv)/

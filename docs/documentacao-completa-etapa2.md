@@ -175,10 +175,10 @@ O PKL contém:
 Comandos:
 
 ```bash
-source .venv/bin/activate
+make bootstrap-crewai
 make bootstrap-flaml
 make train-ml
-streamlit run app.py
+make run
 ```
 
 A instalação do FLAML fica em `.flaml/`, também ignorada pelo Git. A Etapa 2 não exige alteração no Docker/Dify: o Docker continua executando o Dify da Etapa 1, enquanto o Streamlit e o LM Studio executam a rota ML localmente.
@@ -389,7 +389,7 @@ Streamlit → Core Router/CrewAI → agentes especializados
                                   └── LM Studio
 ```
 
-Docker continua executando Dify, Weaviate, Postgres, Redis e proxies. A CrewAI local roda no ambiente Python 3.11 `.crew-venv`, porque o ambiente principal Python 3.14 não é compatível com a versão instalada do CrewAI. O LM Studio permanece no host, acessível localmente por `127.0.0.1:1234` ou, em um futuro container de agentes, por `host.docker.internal:1234`.
+Docker continua executando Dify, Weaviate, Postgres, Redis e proxies. A aplicação SkillGraph roda em um único ambiente oficial `.venv` com Python 3.11, incluindo Streamlit, CrewAI e as dependências de ML/OCR. O LM Studio permanece no host, acessível localmente por `127.0.0.1:1234` ou, em um futuro container de agentes, por `host.docker.internal:1234`.
 
 ### Arquivos da arquitetura multiagente
 

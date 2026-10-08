@@ -37,10 +37,10 @@ O O*NET não contém histórico individual de colaboradores. O perfil de um cola
 ## Execução
 
 ```bash
-source .venv/bin/activate
+make bootstrap-crewai
 make bootstrap-flaml
 make train-ml
-streamlit run app.py
+make run
 ```
 
 A aba é acessível aos três perfis simulados. Analistas e gestores de RH devem escrever sobre um colaborador, por exemplo: “colaborador da equipe de dados com Python avançado e SQL intermediário”. Não informe nome, CPF, e-mail ou outro identificador.

@@ -47,7 +47,6 @@ def test_relational_indicator_query_returns_aggregates():
         db.close()
 
 
-
 def test_write_queries_are_rejected():
     db = SkillGraphDatabase(DATA_DIR)
     try:

@@ -48,6 +48,14 @@ blocked → guardrail, sem ferramenta/LLM
 
 A Etapa 1 observa apenas RAG, SQL, guardrails e streaming. O pipeline ML de competências, suas métricas e seus artefatos pertencem à Etapa 2 e estão documentados em [documentacao-completa-etapa2.md](documentacao-completa-etapa2.md).
 
+## Painel de Observabilidade da Etapa 2
+
+O perfil `desenvolvedor` possui a área `Observabilidade`, separada do Chat e da aba ML. Ela mostra métricas agregadas e traces sanitizados por serviço/agente/tarefa. O checkbox antigo da sidebar foi removido.
+
+Cada trace registra, quando disponível: `trace_id`, timestamp, rota, status, duração total, spans, tarefas/agentes, tokens de entrada/saída, custo estimado, erros e timeouts. O sistema não registra PII, currículo bruto, prompts privados ou chain-of-thought.
+
+O SDK Langfuse é opcional e no-op quando `LANGFUSE_ENABLED=false`; não é necessário clonar o repositório nem adicionar um serviço ao Docker nesta fase. O painel local funciona sem credenciais. Alertas Slack também são opcionais; `SLACK_ALERTS_ENABLED=false` é o padrão. A implementação usa um Bot User OAuth Token com `chat:write` e o ID do canal; ambos ficam somente no `.env` local.
+
 ## System prompt
 
 O comportamento documental esperado do LLM está descrito em [system-prompt.md](system-prompt.md), com regras de domínio, fundamentação no contexto recuperado, fontes e privacidade.

@@ -76,23 +76,24 @@ Nenhuma configuração manual de agente no site TypeSafe é necessária para a A
 
 ## Upload e OCR
 
-O upload de currículo ocorre no chat principal: o PDF é salvo temporariamente, extraído localmente com PyMuPDF e apagado no final. PDFs sem texto extraível geram erro controlado até o OCR ser habilitado. A aba ML continua dedicada à recomendação manual de trilhas. O CrewAI/JEV desativado não faz chamadas externas.
+O upload de currículo ocorre no chat principal: o PDF é salvo temporariamente, extraído localmente com PyMuPDF e, se necessário, processado pelo OCR local. O arquivo temporário é apagado ao final da extração. A aba ML continua dedicada à recomendação manual de trilhas. O CrewAI/JEV desativado não faz chamadas externas.
 
 ## Execução local
 
-A instalação atual não exige CrewAI para iniciar o Streamlit. Para ativar a crew real:
+O SkillGraph usa um único ambiente oficial `.venv` com Python 3.11, que contém Streamlit, CrewAI e as demais dependências da aplicação. Para preparar e iniciar:
 
 ```bash
-source .venv/bin/activate
-pip install -r requirements.txt
-CREWAI_ENABLED=true streamlit run app.py
+make bootstrap-crewai
+CREWAI_ENABLED=true make run
 ```
+
+O usuário não precisa alternar entre ambientes Python. O comando `make run-crewai` permanece como alias de compatibilidade e usa o mesmo `.venv` oficial.
 
 Variáveis:
 
 ```env
 CREWAI_ENABLED=false
-CREWAI_LLM_MODEL=meta-llama-3-8b-instruct
+CREWAI_LLM_MODEL=openai/meta-llama-3-8b-instruct
 CREWAI_LLM_BASE_URL=http://127.0.0.1:1234/v1
 CREWAI_LLM_API_KEY=lm-studio-local
 CREWAI_PROCESS=sequential

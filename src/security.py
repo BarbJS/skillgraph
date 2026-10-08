@@ -28,14 +28,22 @@ class SecurityDecision:
 
 
 _SENSITIVE_PATTERNS = (
-    ("pii", r"\bcpf\b|\brg\b|\bcnpj\b|e-?mail pessoal|telefone pessoal|endereço pessoal"),
+    (
+        "pii",
+        r"\bcpf\b|\brg\b|\bcnpj\b|e-?mail pessoal|telefone pessoal|endereço pessoal",
+    ),
     ("individual_compensation", r"sal[aá]rio individual|remunera[çc][aã]o de f\d{4}"),
-    ("prompt_injection", r"ignore (as|suas) regras|revele (o|seu|suas) prompt|mostre (as|suas) instru[çc][õo]es"),
+    (
+        "prompt_injection",
+        r"ignore (as|suas) regras|ignore o escopo|revele (o|seu|suas) prompt|mostre (as|suas) instru[çc][õo]es",
+    ),
     ("unsafe_sql", r"\b(select|insert|update|delete|drop|alter)\b(?:\s+\w+){0,4}"),
 )
 
 
-def evaluate_input(question: str, role: UserRole = UserRole.DESENVOLVEDOR) -> SecurityDecision:
+def evaluate_input(
+    question: str, role: UserRole = UserRole.DESENVOLVEDOR
+) -> SecurityDecision:
     """Apply domain guardrails before any model or database call."""
 
     normalized = " ".join(question.lower().split())

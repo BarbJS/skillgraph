@@ -10,6 +10,8 @@ from typing import Any
 
 import requests
 
+from src.observability import TraceContext
+
 
 class DifyClientError(RuntimeError):
     """Raised when the Dify API cannot complete a request."""
@@ -36,12 +38,14 @@ class DifyClient:
         *,
         timeout: tuple[float, float] = (10.0, 180.0),
         session: requests.Session | None = None,
+        trace: TraceContext | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.user_id = user_id
         self.timeout = timeout
         self.session = session or requests.Session()
+        self.trace = trace
 
     @classmethod
     def from_environment(cls) -> "DifyClient":
@@ -86,6 +90,13 @@ class DifyClient:
         }
 
         try:
+            span = (
+                self.trace.span("dify.chat_stream", "dify", task_name="chat-messages")
+                if self.trace
+                else None
+            )
+            if span:
+                span.__enter__()
             response = self.session.post(
                 f"{self.base_url}/v1/chat-messages",
                 headers=headers,
@@ -93,7 +104,11 @@ class DifyClient:
                 stream=True,
                 timeout=self.timeout,
             )
+            if span:
+                span.__exit__(None, None, None)
         except requests.RequestException as exc:
+            if "span" in locals() and span:
+                span.__exit__(type(exc), exc, exc.__traceback__)
             raise DifyClientError(
                 "Não foi possível conectar ao Dify local. "
                 "Confirme se os containers estão ativos."
@@ -162,7 +177,9 @@ class DifyClient:
                     str(message or "O workflow do Dify falhou durante o streaming.")
                 )
         if not result.answer:
-            raise DifyClientError("O Dify encerrou o streaming sem retornar uma resposta.")
+            raise DifyClientError(
+                "O Dify encerrou o streaming sem retornar uma resposta."
+            )
         return result
 
 
@@ -212,10 +229,7 @@ def _extract_sources(metadata: Any) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             continue
         document = str(
-            item.get("document_name")
-            or item.get("title")
-            or item.get("name")
-            or ""
+            item.get("document_name") or item.get("title") or item.get("name") or ""
         ).strip()
         content = str(item.get("content") or "").strip()
         key = (document, content)

@@ -23,6 +23,7 @@ class EmployeeProfile(BaseModel):
     source: Literal["manual", "uploaded_resume", "mock"] = "manual"
     contains_pii: bool = False
     missing_information: list[str] = Field(default_factory=list)
+    unrecognized_skills: list[SkillEvidence] = Field(default_factory=list)
 
 
 class TrackRecommendation(BaseModel):
@@ -63,6 +64,16 @@ class ReviewResult(BaseModel):
     issues: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     requires_human_review: bool = True
+
+
+class CoreRouteDecision(BaseModel):
+    """Public Core handoff; never contains private model reasoning."""
+
+    model_config = ConfigDict(extra="forbid")
+    intent: str = Field(default="clarify", max_length=80)
+    next_agent: str = Field(default="Safety Reviewer", max_length=120)
+    reason: str = Field(default="", max_length=500)
+    validation: str = Field(default="", max_length=500)
 
 
 class AgentRequest(BaseModel):

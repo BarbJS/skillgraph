@@ -91,19 +91,18 @@ Os logs locais registram apenas metadados como rota, status, latência, request 
 Pré-requisitos:
 
 - Docker Desktop com Compose v2;
-- Python 3.11 ou superior;
+- Python 3.11.x (versão oficial suportada pelo projeto);
 - Git, `curl` e opcionalmente `jq`;
 - LM Studio com chat e embeddings.
 
 ```bash
 cp env.example .env
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+make bootstrap-crewai
+# O comando prepara o ambiente oficial .venv com Python 3.11.
 make bootstrap
 make up
 make smoke
-streamlit run app.py
+make run
 ```
 
 O Dify fica em `http://localhost` e o Streamlit em `http://localhost:8501`.

@@ -9,7 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.agents.schemas import EmployeeProfile, FinalAgentResponse, PredictionResult, ReviewResult, TrainingRecommendation
+from src.agents.schemas import (
+    EmployeeProfile,
+    FinalAgentResponse,
+    PredictionResult,
+    ReviewResult,
+    TrainingRecommendation,
+)
 
 
 @dataclass
@@ -25,7 +31,9 @@ class AgentFlowState:
     def as_context(self) -> dict[str, Any]:
         return {
             "message": self.message,
-            "employee_profile": self.employee_profile.model_dump() if self.employee_profile else None,
+            "employee_profile": (
+                self.employee_profile.model_dump() if self.employee_profile else None
+            ),
             "prediction": self.prediction.model_dump() if self.prediction else None,
             "trainings": [item.model_dump() for item in self.trainings],
             "policy": self.policy,

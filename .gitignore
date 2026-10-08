@@ -12,8 +12,9 @@
 dify/
 volumes/
 
-# Ambientes virtuais e artefatos de empacotamento Python
+# Ambiente virtual oficial e artefatos de empacotamento Python
 .venv/
+# Ambiente legado do CrewAI; mantido apenas para não expor instalações antigas locais.
 .crew-venv/
 venv/
 ENV/
@@ -60,6 +61,7 @@ data_bd/dataset_ml.csv
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.deepeval/
 .coverage
 htmlcov/
 *.tmp

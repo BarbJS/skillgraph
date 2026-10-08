@@ -48,11 +48,19 @@ class MetricsStore:
                 "total_requests": self.total_requests,
                 "blocked_requests": self.blocked_requests,
                 "errors": self.errors,
-                "average_latency_ms": round(self.total_latency_ms / self.total_requests, 2) if self.total_requests else 0.0,
+                "average_latency_ms": (
+                    round(self.total_latency_ms / self.total_requests, 2)
+                    if self.total_requests
+                    else 0.0
+                ),
                 "sources_seen": self.sources_seen,
                 "tools_seen": self.tools_seen,
                 "routes": dict(self.routes),
-                "block_rate": round(self.blocked_requests / self.total_requests, 4) if self.total_requests else 0.0,
+                "block_rate": (
+                    round(self.blocked_requests / self.total_requests, 4)
+                    if self.total_requests
+                    else 0.0
+                ),
             }
 
     def reset(self) -> None:

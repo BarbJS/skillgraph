@@ -191,7 +191,7 @@ O Weaviate armazena e recupera os vetores usados internamente pelo Dify. Essa de
 Instale ou tenha disponível:
 
 - Docker Desktop com Docker Compose v2;
-- Python 3.11 ou superior;
+- Python 3.11.x (versão oficial suportada pelo projeto);
 - Git, `curl` e, opcionalmente, `jq`;
 - LM Studio com um modelo de chat carregado;
 - um modelo de embeddings compatível com o endpoint `/v1/embeddings`;
@@ -252,8 +252,9 @@ No host, o LM Studio normalmente responde em `http://127.0.0.1:1234/v1`. Dentro 
 ### 4. Instalar as dependências Python
 
 ```bash
-source .venv/bin/activate
-pip install -r requirements.txt
+make bootstrap-crewai
+
+# O comando acima prepara o ambiente oficial .venv com Python 3.11.
 ```
 
 No Windows, ative o ambiente virtual com o comando equivalente do PowerShell ou do terminal utilizado.
@@ -263,10 +264,12 @@ No Windows, ative o ambiente virtual com o comando equivalente do PowerShell ou 
 Com o Chatflow publicado e a chave local configurada em `.env`, execute:
 
 ```bash
-streamlit run app.py
+make run
 ```
 
 A aplicação normalmente ficará disponível em `http://localhost:8501`. A chave da API do Dify é utilizada pelo processo Python e não é enviada ao navegador.
+
+
 
 A Etapa 2 de Machine Learning possui execução e documentação próprias em [docs/documentacao-completa-etapa2.md](docs/documentacao-completa-etapa2.md). Para preparar o artefato da Etapa 2, execute `make bootstrap-flaml` e `make train-ml` conforme o guia específico.
 
@@ -280,7 +283,7 @@ A configuração dos documentos, embeddings, chunks e Top K é feita no próprio
 make bootstrap
 make up
 make smoke
-streamlit run app.py
+make run
 ```
 
 Depois de criar a base de conhecimento e publicar o Chatflow, não é necessário indexar uma segunda base vetorial local. Essa decisão mantém uma única fonte de recuperação, evita resultados divergentes e simplifica a reprodução e a operação do projeto.
@@ -382,6 +385,25 @@ Descrição não identificadora do colaborador
 
 Guias técnicos: [docs/ml-traditional.md](docs/ml-traditional.md), [docs/ml-llm-integration.md](docs/ml-llm-integration.md) e [docs/evaluation-ml.md](docs/evaluation-ml.md).
 
+## 🔖 Versão e qualidade do repositório
+
+A versão corrente do milestone está em [VERSION](VERSION) e as mudanças são registradas em [CHANGELOG.md](CHANGELOG.md). O projeto usa Python 3.11 como runtime oficial.
+
+Para preparar o ambiente de desenvolvimento e ativar os hooks locais:
+
+```bash
+make install-dev
+make lint
+```
+
+A validação equivalente à CI pode ser executada localmente com:
+
+```bash
+make ci
+```
+
+A CI roda em pull requests e pushes para `main`. Releases são publicados somente quando uma tag SemVer como `v0.3.0` é criada e o conteúdo de `VERSION` corresponde à tag.
+
 ## 🧪 Testes e avaliação
 
 Com o ambiente virtual ativado e as dependências instaladas:
@@ -448,6 +470,8 @@ Esse documento reúne a explicação aprofundada que acompanha esta entrega e se
 - [System prompt contextualizado](docs/system-prompt.md)
 - [Text-to-SQL seguro](docs/text-to-sql.md)
 - [Observabilidade](docs/observability.md)
+- [Alertas Slack](docs/slack-alerts.md)
+- [Avaliação robusta de IA](docs/evaluation-ai.md)
 
 ## 🎓 Contexto acadêmico e autoria
 

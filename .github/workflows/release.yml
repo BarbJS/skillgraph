@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CREWAI_ENABLED: "false"
+      JEV_ENABLED: "false"
+      LANGFUSE_ENABLED: "false"
+      SLACK_ALERTS_ENABLED: "false"
+      EVAL_JUDGE_ENABLED: "false"
+      TOXICITY_LIVE_ENABLED: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Validate tag and version
+        run: |
+          test "v$(tr -d '[:space:]' < VERSION)" = "$GITHUB_REF_NAME"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest -q tests
+
+      - name: Build package
+        run: bash scripts/package-etapa1.sh
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/skillgraph-etapa1.zip --generate-notes --title "$GITHUB_REF_NAME"

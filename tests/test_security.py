@@ -15,4 +15,6 @@ def test_sensitive_categories_are_blocked():
 
 
 def test_normal_domain_question_is_allowed():
-    assert evaluate_input("Qual é a carga horária de um cargo sênior?", UserRole.RH).allowed
+    assert evaluate_input(
+        "Qual é a carga horária de um cargo sênior?", UserRole.RH
+    ).allowed

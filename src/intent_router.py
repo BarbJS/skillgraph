@@ -29,6 +29,7 @@ _BLOCKED = (
     r"sal[aá]rio individual",
     r"endereço",
     r"ignore (as|suas) regras",
+    r"ignore o escopo",
     r"mostre (o|as) prompt",
     r"revele (suas|as) instruções",
     r"\b(select|insert|update|delete|drop|alter)\b(?:\s+\w+){0,4}",
@@ -54,6 +55,7 @@ _SMALLTALK = (
     r"^(oi|olá|ola|bom dia|boa tarde|boa noite)[!,. ]*$",
     r"^(obrigad[oa]|valeu)[!,. ]*$",
     r"^tudo bem[?!. ]*$",
+    r"^oi[,! ]*tudo bem[?!. ]*$",
     r"^como você está[?!. ]*$",
     r"^como voce esta[?!. ]*$",
     r"^(tchau|até mais|ate mais)[!,. ]*$",
@@ -69,12 +71,19 @@ def _is_smalltalk(normalized: str) -> bool:
 
 def _is_comparison(normalized: str) -> bool:
     has_comparison = any(re.search(pattern, normalized) for pattern in _COMPARISON)
-    has_measure = any(term in normalized for term in ("carga", "horas", "nível", "nivel"))
+    has_measure = any(
+        term in normalized for term in ("carga", "horas", "nível", "nivel")
+    )
     return has_comparison and has_measure
 
 
 def route_question(question: str) -> Route:
     normalized = " ".join(question.lower().split())
+    if _is_smalltalk(normalized):
+        return Route(
+            Intent.SMALLTALK,
+            "Mensagem social simples, sem necessidade de consultar o corpus.",
+        )
     if any(re.search(pattern, normalized) for pattern in _BLOCKED):
         return Route(
             Intent.BLOCKED,

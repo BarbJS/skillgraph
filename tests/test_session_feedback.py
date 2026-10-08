@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from src.feedback import FeedbackStore
 from src.session_store import SessionStore
 
@@ -7,9 +5,15 @@ from src.session_store import SessionStore
 def test_session_store_persists_and_searches(tmp_path):
     store = SessionStore(tmp_path / "state.sqlite")
     conversation = store.create_conversation("Pergunta inicial")
-    message_id = store.add_message(conversation, "user", "Quais competências têm mais lacunas?", route="sql_indicator")
+    message_id = store.add_message(
+        conversation,
+        "user",
+        "Quais competências têm mais lacunas?",
+        route="sql_indicator",
+    )
     store.add_message(conversation, "assistant", "Resultado", route="sql_indicator")
     assert store.messages(conversation)[0]["id"] == message_id
+    assert store.messages(conversation)[0]["reasoning"] == []
     assert store.search_conversations("lacunas")[0]["id"] == conversation
     store.rename_conversation(conversation, "Indicadores de lacunas")
     assert store.get_conversation(conversation)["title"] == "Indicadores de lacunas"

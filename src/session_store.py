@@ -43,55 +43,103 @@ class SessionStore:
                     route TEXT NOT NULL DEFAULT '',
                     request_id TEXT NOT NULL DEFAULT '',
                     sources_json TEXT NOT NULL DEFAULT '[]',
+                    reasoning_json TEXT NOT NULL DEFAULT '[]',
                     created_at TEXT NOT NULL,
                     FOREIGN KEY (conversation_id) REFERENCES conversations(id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
                 """
             )
-            columns = {row[1] for row in db.execute("PRAGMA table_info(conversations)").fetchall()}
+            columns = {
+                row[1]
+                for row in db.execute("PRAGMA table_info(conversations)").fetchall()
+            }
             if "role" not in columns:
-                db.execute("ALTER TABLE conversations ADD COLUMN role TEXT NOT NULL DEFAULT 'desenvolvedor'")
+                db.execute(
+                    "ALTER TABLE conversations ADD COLUMN role TEXT NOT NULL DEFAULT 'desenvolvedor'"
+                )
             if "agent_state_json" not in columns:
-                db.execute("ALTER TABLE conversations ADD COLUMN agent_state_json TEXT NOT NULL DEFAULT '{}'")
+                db.execute(
+                    "ALTER TABLE conversations ADD COLUMN agent_state_json TEXT NOT NULL DEFAULT '{}'"
+                )
+            message_columns = {
+                row[1] for row in db.execute("PRAGMA table_info(messages)").fetchall()
+            }
+            if "reasoning_json" not in message_columns:
+                db.execute(
+                    "ALTER TABLE messages ADD COLUMN reasoning_json TEXT NOT NULL DEFAULT '[]'"
+                )
 
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    def create_conversation(self, title: str = "Nova conversa", backend: str = "dify", role: str = "desenvolvedor") -> str:
+    def create_conversation(
+        self,
+        title: str = "Nova conversa",
+        backend: str = "dify",
+        role: str = "desenvolvedor",
+    ) -> str:
         conversation_id, now = str(uuid.uuid4()), self._now()
         with self._connect() as db:
-            db.execute("INSERT INTO conversations (id,title,dify_conversation_id,backend,created_at,updated_at,role) VALUES (?, ?, '', ?, ?, ?, ?)", (conversation_id, title[:80], backend, now, now, role))
+            db.execute(
+                "INSERT INTO conversations (id,title,dify_conversation_id,backend,created_at,updated_at,role) VALUES (?, ?, '', ?, ?, ?, ?)",
+                (conversation_id, title[:80], backend, now, now, role),
+            )
         return conversation_id
 
     def list_conversations(self, role: str | None = None) -> list[dict[str, Any]]:
         where, params = ("WHERE role = ?", (role,)) if role else ("", ())
         with self._connect() as db:
-            rows = db.execute(f"SELECT id,title,dify_conversation_id,backend,created_at,updated_at,role FROM conversations {where} ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC, id DESC", params).fetchall()
+            rows = db.execute(
+                f"SELECT id,title,dify_conversation_id,backend,created_at,updated_at,role FROM conversations {where} ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC, id DESC",
+                params,
+            ).fetchall()
         return [dict(row) for row in rows]
 
-    def get_conversation(self, conversation_id: str, role: str | None = None) -> dict[str, Any] | None:
+    def get_conversation(
+        self, conversation_id: str, role: str | None = None
+    ) -> dict[str, Any] | None:
         query, params = "SELECT * FROM conversations WHERE id = ?", [conversation_id]
         if role:
-            query += " AND role = ?"; params.append(role)
+            query += " AND role = ?"
+            params.append(role)
         with self._connect() as db:
             row = db.execute(query, params).fetchone()
         return dict(row) if row else None
 
-    def set_title(self, conversation_id: str, title: str, role: str | None = None) -> None:
-        query, params = "UPDATE conversations SET title=?,updated_at=? WHERE id=?", [title[:80], self._now(), conversation_id]
-        if role: query += " AND role=?"; params.append(role)
-        with self._connect() as db: db.execute(query, params)
+    def set_title(
+        self, conversation_id: str, title: str, role: str | None = None
+    ) -> None:
+        query, params = "UPDATE conversations SET title=?,updated_at=? WHERE id=?", [
+            title[:80],
+            self._now(),
+            conversation_id,
+        ]
+        if role:
+            query += " AND role=?"
+            params.append(role)
+        with self._connect() as db:
+            db.execute(query, params)
 
     rename_conversation = set_title
 
-    def set_dify_conversation(self, conversation_id: str, dify_id: str, role: str | None = None) -> None:
-        query, params = "UPDATE conversations SET dify_conversation_id=?,updated_at=? WHERE id=?", [dify_id, self._now(), conversation_id]
-        if role: query += " AND role=?"; params.append(role)
-        with self._connect() as db: db.execute(query, params)
+    def set_dify_conversation(
+        self, conversation_id: str, dify_id: str, role: str | None = None
+    ) -> None:
+        query, params = (
+            "UPDATE conversations SET dify_conversation_id=?,updated_at=? WHERE id=?",
+            [dify_id, self._now(), conversation_id],
+        )
+        if role:
+            query += " AND role=?"
+            params.append(role)
+        with self._connect() as db:
+            db.execute(query, params)
 
-    def search_conversations(self, text: str, role: str | None = None) -> list[dict[str, Any]]:
+    def search_conversations(
+        self, text: str, role: str | None = None
+    ) -> list[dict[str, Any]]:
         query = f"%{text.strip()}%"
         clauses = ["(c.title LIKE ? OR m.content LIKE ?)"]
         params: list[Any] = [query, query]
@@ -107,7 +155,9 @@ class SessionStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def agent_state(self, conversation_id: str, role: str | None = None) -> dict[str, Any]:
+    def agent_state(
+        self, conversation_id: str, role: str | None = None
+    ) -> dict[str, Any]:
         conversation = self.get_conversation(conversation_id, role)
         if not conversation:
             return {}
@@ -117,31 +167,86 @@ class SessionStore:
             return {}
         return state if isinstance(state, dict) else {}
 
-    def update_agent_state(self, conversation_id: str, state: dict[str, Any], role: str | None = None) -> None:
+    def update_agent_state(
+        self, conversation_id: str, state: dict[str, Any], role: str | None = None
+    ) -> None:
         if not self.get_conversation(conversation_id, role):
             raise ValueError("Conversa não encontrada para este perfil.")
         with self._connect() as db:
-            db.execute("UPDATE conversations SET agent_state_json=?, updated_at=? WHERE id=?", (json.dumps(state, ensure_ascii=False), self._now(), conversation_id))
+            db.execute(
+                "UPDATE conversations SET agent_state_json=?, updated_at=? WHERE id=?",
+                (json.dumps(state, ensure_ascii=False), self._now(), conversation_id),
+            )
 
-    def add_message(self, conversation_id: str, role: str, content: str, *, route: str = "", request_id: str = "", sources: list[dict[str, str]] | None = None, conversation_role: str | None = None) -> str:
+    def add_message(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
+        *,
+        route: str = "",
+        request_id: str = "",
+        sources: list[dict[str, str]] | None = None,
+        reasoning: list[dict[str, Any]] | None = None,
+        conversation_role: str | None = None,
+    ) -> str:
         if not self.get_conversation(conversation_id, conversation_role):
             raise ValueError("Conversa não encontrada para este perfil.")
         message_id, now = str(uuid.uuid4()), self._now()
         with self._connect() as db:
-            db.execute("INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (message_id, conversation_id, role, content, route, request_id, json.dumps(sources or [], ensure_ascii=False), now))
-            db.execute("UPDATE conversations SET updated_at=? WHERE id=?", (now, conversation_id))
+            db.execute(
+                "INSERT INTO messages (id, conversation_id, role, content, route, request_id, sources_json, reasoning_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    message_id,
+                    conversation_id,
+                    role,
+                    content,
+                    route,
+                    request_id,
+                    json.dumps(sources or [], ensure_ascii=False),
+                    json.dumps(reasoning or [], ensure_ascii=False),
+                    now,
+                ),
+            )
+            db.execute(
+                "UPDATE conversations SET updated_at=? WHERE id=?",
+                (now, conversation_id),
+            )
         return message_id
 
-    def messages(self, conversation_id: str, role: str | None = None) -> list[dict[str, Any]]:
-        if not self.get_conversation(conversation_id, role): return []
-        with self._connect() as db:
-            rows = db.execute("SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at", (conversation_id,)).fetchall()
-        result = []
-        for row in rows:
-            item = dict(row); item["sources"] = json.loads(item.pop("sources_json") or "[]"); result.append(item)
-        return result
+    @staticmethod
+    def _decode_json(value: str, fallback: Any) -> Any:
+        try:
+            decoded = json.loads(value or "")
+        except json.JSONDecodeError:
+            return fallback
+        return decoded
 
-    def delete_conversation(self, conversation_id: str, role: str | None = None) -> None:
-        if not self.get_conversation(conversation_id, role): return
+    def _message_row(self, row: sqlite3.Row) -> dict[str, Any]:
+        item = dict(row)
+        item["sources"] = self._decode_json(item.pop("sources_json", "[]"), [])
+        item["reasoning"] = self._decode_json(item.pop("reasoning_json", "[]"), [])
+        return item
+
+    def messages(
+        self, conversation_id: str, role: str | None = None
+    ) -> list[dict[str, Any]]:
+        if not self.get_conversation(conversation_id, role):
+            return []
         with self._connect() as db:
-            db.execute("DELETE FROM messages WHERE conversation_id=?", (conversation_id,)); db.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+            rows = db.execute(
+                "SELECT * FROM messages WHERE conversation_id=? ORDER BY created_at",
+                (conversation_id,),
+            ).fetchall()
+        return [self._message_row(row) for row in rows]
+
+    def delete_conversation(
+        self, conversation_id: str, role: str | None = None
+    ) -> None:
+        if not self.get_conversation(conversation_id, role):
+            return
+        with self._connect() as db:
+            db.execute(
+                "DELETE FROM messages WHERE conversation_id=?", (conversation_id,)
+            )
+            db.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
