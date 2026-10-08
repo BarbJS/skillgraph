@@ -5,7 +5,7 @@ pymupdf>=1.24,<2
 pytesseract>=0.3,<1
 Pillow>=10,<13
 deepeval==2.9.7
-pydantic>=2.0.0
+pydantic>=2.13.5
 # Official application runtime: Python 3.11.x. CrewAI is part of the main environment.
 crewai==0.203.2
 streamlit==1.49.1
