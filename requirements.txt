@@ -2,7 +2,7 @@
 python-dotenv==1.1.1
 requests==2.32.5
 pymupdf>=1.24,<2
-pytesseract>=0.3,<1
+pytesseract>=0.3.13,<1
 Pillow>=10,<13
 deepeval==2.9.7
 pydantic>=2.0.0
