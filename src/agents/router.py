@@ -47,14 +47,14 @@ def route_turn(message: str, *, has_resume: bool = False) -> AgentRoute:
         return AgentRoute.GAP
     if any(
         term in normalized
-        for term in ("treinamento", "treinamentos", "curso", "cursos")
-    ):
-        return AgentRoute.TRAINING
-    if any(
-        term in normalized
         for term in ("política", "politica", "reembolso", "elegibilidade")
     ):
         return AgentRoute.POLICY
+    if any(
+        term in normalized
+        for term in ("treinamento", "treinamentos", "curso", "cursos")
+    ):
+        return AgentRoute.TRAINING
     if any(
         term in normalized
         for term in ("indicador", "quantos funcionários", "quantas pessoas")

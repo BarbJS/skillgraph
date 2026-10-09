@@ -44,23 +44,24 @@ def run_agent_turn(
             "state_patch": {},
         }
     route = route_turn(message, has_resume=has_resume)
-    if trace:
-        with trace.span(
+    active_trace = trace or current_trace()
+    if active_trace:
+        with active_trace.span(
             "crewai.core_router",
             "crewai",
             task_name="route_turn",
             metadata={"route": route.value, "has_resume": has_resume},
         ):
             pass
-    trace = current_trace()
-    if trace:
-        with trace.span(
-            "crewai.core_router",
-            "crewai",
-            task_name="route_turn",
-            metadata={"route": route.value},
-        ):
-            pass
+        trace = active_trace
+    else:
+        trace = None
+
+    def _trace_tool(name: str, service: str, task_name: str, callback):
+        if trace:
+            with trace.span(name, service, task_name=task_name):
+                return callback()
+        return callback()
     if route == AgentRoute.SMALLTALK:
         return {
             "status": "local",
@@ -90,14 +91,14 @@ def run_agent_turn(
             )
         )
         database = None
-        jev = JevClient() if route == AgentRoute.RESUME else None
+        jev = JevClient(trace=trace) if route == AgentRoute.RESUME else None
         dify = None
         if route in {AgentRoute.TRAINING, AgentRoute.STRUCTURED}:
             database = SkillGraphDatabase(
                 Path(os.getenv("SKILLGRAPH_DATA_DIR", "data_bd"))
             )
         if route == AgentRoute.POLICY:
-            dify = DifyClient.from_environment()
+            dify = DifyClient.from_environment(trace=trace)
 
         def prediction_tool(profile_json: str) -> str:
             """Run the persisted competency PKL for a validated profile."""
@@ -108,7 +109,12 @@ def run_agent_turn(
                 for item in profile.get("skills", [])
             }
             return json.dumps(
-                competency_recommendation_tool(artifact_path, skills),
+                _trace_tool(
+                    "tool.competency_recommendation",
+                    "ml",
+                    "CompetencyRecommendationTool",
+                    lambda: competency_recommendation_tool(artifact_path, skills),
+                ),
                 ensure_ascii=False,
             )
 
@@ -117,7 +123,12 @@ def run_agent_turn(
             if database is None:
                 raise RuntimeError("DuckDB não foi habilitado para esta rota.")
             return json.dumps(
-                training_catalog_tool(database, competency or None),
+                _trace_tool(
+                    "tool.training_catalog",
+                    "duckdb",
+                    "TrainingCatalogTool",
+                    lambda: training_catalog_tool(database, competency or None),
+                ),
                 ensure_ascii=False,
                 default=str,
             )
@@ -127,8 +138,16 @@ def run_agent_turn(
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
             return json.dumps(
-                policy_rag_tool(dify, question), ensure_ascii=False, default=str
+                _trace_tool(
+                    "tool.policy_rag",
+                    "dify",
+                    "DifyPolicyTool",
+                    lambda: policy_rag_tool(dify, question),
+                ),
+                ensure_ascii=False,
+                default=str,
             )
+
 
         tools = {
             "CompetencyRecommendationTool": prediction_tool,
@@ -190,6 +209,13 @@ def run_agent_turn(
             if route == AgentRoute.RESUME
             else []
         )
+        tool_by_role = {
+            "Resume Interpreter": "JevResumeExtractionTool",
+            "Prediction Specialist": "CompetencyRecommendationTool",
+            "Learning Path & Training Recommendation Agent": "TrainingCatalogTool",
+            "Policy Specialist": "DifyPolicyTool",
+            "Structured Data Specialist": "TrainingCatalogTool",
+        }
         if route == AgentRoute.ML:
             roles = ["Prediction Specialist"]
         elif route == AgentRoute.GAP:
@@ -201,7 +227,7 @@ def run_agent_turn(
         elif route == AgentRoute.STRUCTURED:
             roles = ["Structured Data Specialist"]
         for role in roles:
-            reasoning_steps.append(task_step(role, tool=role))
+            reasoning_steps.append(task_step(role, tool=tool_by_role.get(role, role)))
         reasoning_steps.extend(
             [
                 task_step("Safety Reviewer", tool="Safety Reviewer"),

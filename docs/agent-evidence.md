@@ -11,7 +11,7 @@ Este documento registra os cenários multiagente definidos para avaliação da E
 | Política | `policy_rag` | Core → Policy → Reviewer → Synthesizer | Dify Chatflow |
 | Currículo | `resume_analysis` | Core → Resume Interpreter → Profile → Reviewer → Synthesizer | OCR/PyMuPDF + JEV backend |
 
-O Core Router continua sendo obrigatório. O especialista é escolhido por rota e agentes de outras especialidades não são instanciados. Cada ferramenta recebe somente os argumentos e permissões necessários.
+O Core Router continua sendo obrigatório. Com `CREWAI_ENABLED=true`, o chat principal encaminha perguntas de treinamentos e políticas para o runtime multiagente; o especialista é escolhido por rota e agentes de outras especialidades não são instanciados. Quando o CrewAI está desativado ou indisponível, as rotas normais preservam o fallback legado de RAG/SQL. Cada ferramenta recebe somente os argumentos e permissões necessários.
 
 ## Currículo
 

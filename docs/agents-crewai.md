@@ -4,7 +4,7 @@
 
 Nada para o modo local. CrewAI é um framework Python de orquestração; os agentes, prompts, tarefas e ferramentas ficam no repositório. Não é necessário criar cada agente em um painel hospedado nem criar uma conta CrewAI para executar a arquitetura local.
 
-O CrewAI não fornece o LLM. Os agentes usarão o LM Studio local quando `CREWAI_ENABLED=true`, por meio de endpoint OpenAI-compatible. O JEV é um serviço externo separado, chamado como ferramenta pelo agente de currículo.
+O CrewAI não fornece o LLM. Os agentes usarão o LM Studio local quando `CREWAI_ENABLED=true`, por meio de endpoint OpenAI-compatible. O JEV é um serviço externo separado, chamado como ferramenta pelo agente de currículo. No chat principal, as perguntas de treinamentos e políticas também passam pelo runtime multiagente quando essa flag está ativa; com a flag desativada, o sistema usa o fallback legado de RAG/SQL.
 
 ## Agentes
 

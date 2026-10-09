@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import os
 import time
 import uuid
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any
 import pandas as pd
 from src.resume_extractor import ResumeExtractionError, extract_pdf_text
 from src.agents.runtime import run_agent_flow, run_agent_turn
+from src.agents.router import route_turn
 import streamlit as st
 import streamlit.components.v1 as components
 from src.answer_router import (
@@ -1106,8 +1108,6 @@ if question or uploaded_files:
         with trace.span("document.extract", "ocr", task_name="pdf_text_extraction"):
             pass
         with trace.span("crewai.resume", "crewai", task_name="resume_analysis"):
-            from src.agents.runtime import run_agent_flow, run_agent_turn
-
             agent_result = run_agent_flow(
                 question,
                 resume_text=resume_text,
@@ -1147,12 +1147,18 @@ if question or uploaded_files:
         )
     conversation_id = st.session_state.active_conversation_id
     route = route_question(question)
-    trace.route = route.intent.value
+    agent_route = route_turn(question)
+    use_agent_runtime = (
+        os.getenv("CREWAI_ENABLED", "false").casefold() == "true"
+        and agent_route.value in {"training_recommendation", "policy_rag"}
+        and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
+    )
+    trace.route = agent_route.value if use_agent_runtime else route.intent.value
     store.add_message(
         conversation_id,
         "user",
         question,
-        route=route.intent.value,
+        route=agent_route.value if use_agent_runtime else route.intent.value,
         request_id=request_id,
         conversation_role=role,
     )
@@ -1170,11 +1176,61 @@ if question or uploaded_files:
         progress = st.empty()
         progress.info("Analisando sua pergunta…")
         answer, sources, tools, table_rows, chart_frame = "", [], [], None, None
+        agent_handled = False
         try:
-            if route.intent is Intent.SMALLTALK:
+            if use_agent_runtime:
+                progress.info("Executando o fluxo multiagente…")
+                agent_result = run_agent_turn(
+                    question,
+                    conversation_state=store.agent_state(
+                        conversation_id, role=role
+                    ),
+                    trace=trace,
+                )
+                agent_status = agent_result.get("status")
+                if agent_status == "completed":
+                    answer = agent_result.get(
+                        "answer", "O fluxo multiagente foi concluído."
+                    )
+                    reasoning_steps = agent_result.get("reasoning", [])
+                    tools = [
+                        "TrainingCatalogTool"
+                        if agent_result.get("route") == "training_recommendation"
+                        else "DifyPolicyTool"
+                    ]
+                    store.update_agent_state(
+                        conversation_id,
+                        {
+                            **store.agent_state(conversation_id, role=role),
+                            **agent_result.get("state_patch", {}),
+                        },
+                        role=role,
+                    )
+                    agent_handled = True
+                elif agent_status == "disabled":
+                    use_agent_runtime = False
+                    trace.route = route.intent.value
+                    progress.info(
+                        "Fluxo multiagente indisponível; usando o fluxo compatível."
+                    )
+                elif agent_status in {"blocked", "clarify", "local"}:
+                    answer = agent_result.get(
+                        "answer", "O fluxo multiagente não foi concluído."
+                    )
+                    reasoning_steps = agent_result.get("reasoning", [])
+                    tools = ["agent_guardrail"]
+                    agent_handled = True
+                else:
+                    raise DifyClientError(
+                        agent_result.get(
+                            "answer", "O fluxo multiagente não foi concluído."
+                        )
+                    )
+
+            if not agent_handled and route.intent is Intent.SMALLTALK:
                 answer = answer_smalltalk_question(question).answer
                 tools = ["smalltalk"]
-            elif route.intent is Intent.COMPARISON:
+            elif not agent_handled and route.intent is Intent.COMPARISON:
                 progress.info("Comparando as informações…")
                 result = answer_comparison_question(question)
                 answer = result.answer
@@ -1188,12 +1244,12 @@ if question or uploaded_files:
                         }
                     )
                 tools = ["training_hours_comparison"]
-            elif route.intent is Intent.COMPETENCY_LOOKUP and database:
+            elif not agent_handled and route.intent is Intent.COMPETENCY_LOOKUP and database:
                 progress.info("Consultando dados de competências…")
                 result = answer_competency_question(question, database)
                 answer = result.answer
                 tools = ["sql:competency_case_lookup"]
-            elif route.intent is Intent.SQL_INDICATOR and database:
+            elif not agent_handled and route.intent is Intent.SQL_INDICATOR and database:
                 progress.info("Consultando dados estruturados…")
                 with trace.span(
                     "duckdb.structured",
@@ -1211,7 +1267,7 @@ if question or uploaded_files:
                         else "sql:training_catalog"
                     )
                 ]
-            elif route.intent is Intent.RAG:
+            elif not agent_handled and route.intent is Intent.RAG:
                 progress.info("Consultando documentos e preparando a resposta…")
                 placeholder = st.empty()
                 dify_id = st.session_state.conversation_id
@@ -1233,7 +1289,7 @@ if question or uploaded_files:
                 st.session_state.conversation_id = dify_id
                 placeholder.empty()
                 tools = ["rag:dify"]
-            else:
+            elif not agent_handled:
                 raise DifyClientError(
                     "Não foi possível encaminhar essa pergunta com segurança."
                 )
@@ -1249,16 +1305,19 @@ if question or uploaded_files:
             record_event(
                 LOG_PATH,
                 request_id=request_id,
-                route=route.intent.value,
+                route=agent_route.value if use_agent_runtime else route.intent.value,
                 status="error",
                 latency_ms=(time.perf_counter() - started) * 1000,
                 error=True,
             )
             st.stop()
 
-        reasoning_steps = route_steps(route.intent.value)
+        if not use_agent_runtime:
+            reasoning_steps = route_steps(route.intent.value)
         _render_public_reasoning(
-            route.intent.value, reasoning_steps, key=f"live-{request_id}"
+            agent_route.value if use_agent_runtime else route.intent.value,
+            reasoning_steps,
+            key=f"live-{request_id}",
         )
         answer, toxicity = safe_response(answer)
         st.markdown(answer)
@@ -1271,7 +1330,7 @@ if question or uploaded_files:
             conversation_id,
             "assistant",
             answer,
-            route=route.intent.value,
+            route=agent_route.value if use_agent_runtime else route.intent.value,
             request_id=request_id,
             sources=sources,
             reasoning=reasoning_steps,
@@ -1281,7 +1340,7 @@ if question or uploaded_files:
             {
                 "id": assistant_id,
                 "content": answer,
-                "route": route.intent.value,
+                "route": agent_route.value if use_agent_runtime else route.intent.value,
                 "trace_id": trace.trace_id,
             }
         )
@@ -1292,7 +1351,7 @@ if question or uploaded_files:
         record_event(
             LOG_PATH,
             request_id=request_id,
-            route=route.intent.value,
+            route=agent_route.value if use_agent_runtime else route.intent.value,
             status="success",
             latency_ms=(time.perf_counter() - started) * 1000,
             tools=tools,

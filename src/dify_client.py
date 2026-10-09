@@ -34,7 +34,9 @@ class DifyClient:
         self.trace = trace
 
     @classmethod
-    def from_environment(cls) -> "DifyClient":
+    def from_environment(
+        cls, *, trace: TraceContext | None = None
+    ) -> "DifyClient":
         base_url = os.getenv("DIFY_API_BASE_URL", "http://localhost").strip()
         api_key = os.getenv("DIFY_API_KEY", "").strip()
         user_id = os.getenv("DIFY_USER_ID", "skillgraph-local-user").strip()
@@ -42,7 +44,7 @@ class DifyClient:
             raise DifyClientError("DIFY_API_KEY não configurada. Preencha o .env local com a chave do Chatflow publicado.")
         if not user_id:
             raise DifyClientError("DIFY_USER_ID não pode ser vazio.")
-        return cls(base_url, api_key, user_id)
+        return cls(base_url, api_key, user_id, trace=trace)
 
     def stream_chat(self, query: str, *, conversation_id: str = "", inputs: Mapping[str, Any] | None = None) -> Iterator[dict[str, Any]]:
         query = query.strip()

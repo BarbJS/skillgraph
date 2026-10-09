@@ -128,6 +128,14 @@ def route_steps(route: str) -> list[dict[str, Any]]:
             "Guardrail",
             "A solicitação foi interrompida antes de acessar ferramentas.",
         ),
+        "training_recommendation": (
+            "Learning Path & Training Recommendation Agent",
+            "A rota multiagente consultou o catálogo de treinamentos permitido.",
+        ),
+        "policy_rag": (
+            "Policy Specialist",
+            "A rota multiagente consultou a política pelo Chatflow Dify.",
+        ),
     }
     label, summary = labels.get(
         route, ("Roteamento", "A solicitação foi encaminhada para o fluxo apropriado.")
