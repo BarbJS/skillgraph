@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 from src.evaluation_ai import load_golden_cases, run_live_deepeval
 from src.deepeval_judge import LocalDeepEvalModel
+from src.deepeval_report import parse_evaluate_output, summarize_results
 
 
 def main():
@@ -45,10 +46,33 @@ def main():
         and c.get("contexts")
         and (not a.deepeval_case or c["id"] == a.deepeval_case)
     ]
+    parsed_results = []
+    raw_results = []
+    for case in selected:
+        live = run_live_deepeval(case, model=model)
+        raw_results.append(
+            {"case_id": case.get("id"), "results": live.get("results", "")}
+        )
+        # The adapter returns the DeepEval object for compatibility; if parsing is
+        # unavailable, retain a safe parse_error rather than fabricating metrics.
+        parsed_results.append(
+            parse_evaluate_output(case, live.get("evaluation"))
+            if live.get("evaluation") is not None
+            else {
+                "case_id": case.get("id"),
+                "category": case.get("category", ""),
+                "metrics": {},
+                "passed": False,
+                "parse_error": "DeepEval output parser did not receive an evaluation object.",
+            }
+        )
     report = {
         "mode": "live",
         "cases": len(cases),
-        "deepeval": [run_live_deepeval(c, model=model) for c in selected],
+        "evaluated_cases": len(selected),
+        "case_results": parsed_results,
+        "raw_results": raw_results,
+        "summary": summarize_results(parsed_results),
         "judge_model": a.judge_model
         or os.getenv("EVAL_JUDGE_MODEL", "meta-llama-3-8b-instruct"),
     }

@@ -50,7 +50,7 @@ A Etapa 1 observa apenas RAG, SQL, guardrails e streaming. O pipeline ML de comp
 
 ## Painel de Observabilidade da Etapa 2
 
-O perfil `desenvolvedor` possui a área `Observabilidade`, separada do Chat e da aba ML. Ela mostra métricas agregadas e traces sanitizados por serviço/agente/tarefa. O checkbox antigo da sidebar foi removido.
+O perfil `desenvolvedor` possui a área `Observabilidade`, separada do Chat e da aba ML. Ela mostra métricas agregadas e traces sanitizados por serviço/agente/tarefa. O dashboard apresenta os 10 traces mais recentes, cada um com Trace ID identificável, timestamp, rota, status, duração, quantidade de spans, tokens de entrada/saída e custo. É possível selecionar um Trace ID e abrir os detalhes dos spans para rastreabilidade sem expor perguntas, respostas, currículo ou prompts privados. O botão de atualização permite recarregar os traces da sessão. O checkbox antigo da sidebar foi removido.
 
 Cada trace registra, quando disponível: `trace_id`, timestamp, rota, status, duração total, spans, tarefas/agentes, tokens de entrada/saída, custo estimado, erros e timeouts. O sistema não registra PII, currículo bruto, prompts privados ou chain-of-thought.
 

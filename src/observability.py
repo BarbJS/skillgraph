@@ -197,25 +197,49 @@ class ObservabilityStore:
             )
 
     def _send_langfuse(self, trace):
+        """Send only aggregate, sanitized trace and span telemetry."""
         try:
             root = self._langfuse.start_as_current_observation(
                 name=trace.route,
                 as_type="span",
-                metadata={"role": trace.role, "user_id": trace.user_id},
+                metadata={"role": trace.role, "user_id": trace.user_id, "status": trace.status},
                 input={"route": trace.route},
             )
-            for s in trace.spans:
-                if s.name != "trace":
-                    root.update(
-                        metadata={
-                            "last_span": s.name,
-                            "service": s.service,
-                            "task_name": s.task_name,
-                            "status": s.status,
-                            "duration_ms": s.duration_ms,
-                        }
-                    )
-            root.update(output={"status": trace.status, "trace_id": trace.trace_id})
+            root.update(
+                output={
+                    "status": trace.status,
+                    "trace_id": trace.trace_id,
+                    "duration_ms": round((time.perf_counter() - trace.started) * 1000, 2),
+                    "input_tokens": sum(s.input_tokens for s in trace.spans),
+                    "output_tokens": sum(s.output_tokens for s in trace.spans),
+                    "cost": round(sum(s.cost for s in trace.spans), 8),
+                    "cost_source": "local_or_unpriced",
+                }
+            )
+            for span in trace.spans:
+                if span.name == "trace":
+                    continue
+                child = self._langfuse.start_as_current_observation(
+                    name=span.name,
+                    as_type="span",
+                    metadata={
+                        "service": span.service,
+                        "task_name": span.task_name,
+                        "status": span.status,
+                    },
+                    input={"trace_id": trace.trace_id},
+                )
+                child.update(
+                    output={
+                        "duration_ms": round(span.duration_ms, 2),
+                        "input_tokens": int(span.input_tokens),
+                        "output_tokens": int(span.output_tokens),
+                        "cost": round(float(span.cost), 8),
+                        "cost_source": "local_or_unpriced",
+                        "status": span.status,
+                    }
+                )
+                child.end()
             root.end()
             self._langfuse.flush()
         except Exception:
@@ -275,6 +299,30 @@ class ObservabilityStore:
             )
         return rows
 
+    def recent_trace_rows(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Return the newest sanitized trace summaries for the developer dashboard."""
+        rows = []
+        for trace in reversed(self.traces[-max(1, limit):]):
+            rows.append({
+                "Trace ID": trace.get("trace_id", ""),
+                "Timestamp": trace.get("timestamp", ""),
+                "Rota": trace.get("route", ""),
+                "Status": trace.get("status", ""),
+                "Duração (ms)": trace.get("duration_ms", 0),
+                "Spans": trace.get("span_count", 0),
+                "Tokens entrada": trace.get("input_tokens", 0),
+                "Tokens saída": trace.get("output_tokens", 0),
+                "Custo": trace.get("cost", 0.0),
+            })
+        return rows
+
+    def get_trace(self, trace_id: str) -> dict[str, Any] | None:
+        """Find one sanitized trace by its support-friendly identifier."""
+        for trace in self.traces:
+            if trace.get("trace_id") == trace_id:
+                return trace
+        return None
+
     def service_metrics(self) -> list[dict[str, Any]]:
         return self._group_metrics("service")
 
@@ -322,7 +370,7 @@ class ObservabilityStore:
             "input_tokens": sum(t.get("input_tokens", 0) for t in ts),
             "output_tokens": sum(t.get("output_tokens", 0) for t in ts),
             "cost": round(sum(t.get("cost", 0) for t in ts), 8),
-            "recent_traces": ts[-20:],
+            "recent_traces": list(reversed(ts[-10:])),
         }
 
 

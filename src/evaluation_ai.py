@@ -78,5 +78,6 @@ def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
     return {
         "case_id": case.get("id"),
         "results": str(results),
+        "evaluation": results,
         "metrics": [type(metric).__name__ for metric in metrics],
     }

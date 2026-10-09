@@ -405,7 +405,265 @@ Docker continua executando Dify, Weaviate, Postgres, Redis e proxies. A aplicaç
 - `src/resume_extractor.py`: extração local de PDF;
 - `config/jev_resume_questions.json`: perguntas Score/Choice/Noul.
 
-## 13. Próximos passos
+## 13. Observabilidade, Langfuse e telemetria
+
+A Etapa 2 ampliou a observabilidade criada na Etapa 1 para acompanhar não apenas as rotas RAG e DuckDB, mas também o ciclo de execução multiagente, o processamento de currículos, as chamadas ao JEV, a inferência ML e as etapas de explicabilidade.
+
+### 13.1 Tracing local
+
+O módulo `src/observability.py` implementa `TraceContext` e `SpanContext`. Cada execução pode registrar, de forma sanitizada:
+
+- `trace_id` anônimo;
+- timestamp;
+- rota executada;
+- perfil simulado;
+- status (`running`, `success`, `error` ou `timeout`);
+- duração total;
+- duração acumulada dos spans;
+- serviço executado;
+- nome da tarefa/agente;
+- tokens de entrada e saída, quando fornecidos pelo provedor;
+- custo estimado, quando houver preço configurado;
+- erros e timeouts;
+- ferramenta ou integração acionada.
+
+As rotas da Etapa 2 podem produzir spans para:
+
+```text
+Streamlit
+  → extração PDF/OCR
+  → Core Router
+  → JEV
+  → agente especialista
+  → PKL/XAI ou DuckDB ou Dify
+  → Reviewer
+  → Synthesizer
+  → resposta final
+```
+
+Os eventos locais são gravados em `logs/observability.jsonl`, que é ignorado pelo Git. O log não deve conter currículo bruto, PII, chaves, prompts privados ou chain-of-thought.
+
+### 13.2 Langfuse
+
+O Langfuse é uma integração opcional para tracing distribuído. Quando `LANGFUSE_ENABLED=true` e as credenciais estão disponíveis no `.env` local, o `ObservabilityStore` envia observações sanitizadas para o Langfuse. Quando a flag está desativada, a aplicação continua funcionando com o painel local e não tenta realizar chamadas externas.
+
+A separação é importante para o contexto acadêmico:
+
+- o tracing local funciona sem infraestrutura adicional;
+- o Langfuse pode ser ativado durante uma demonstração controlada;
+- as credenciais não entram no repositório;
+- o currículo e as perguntas completas não são enviados ao tracing;
+- o custo de modelos locais deve ser tratado como execução local sem preço de API, não como custo financeiro fictício.
+
+O painel técnico do perfil Desenvolvedor está em `src/observability_ui.py`. Ele apresenta traces recentes, latência P50/P95/P99, taxa de erro, timeouts, tokens, custo, métricas por serviço, tarefas/agentes e erros recentes. Para a apresentação da Etapa 2, recomenda-se gerar e preservar uma evidência sanitizada com pelo menos cinco traces de rotas diferentes.
+
+### 13.3 Alertas
+
+`src/alerting.py` integra alertas opcionais com Slack por `chat.postMessage`. O alerta envia apenas severidade, assunto, trace ID, rota e métricas operacionais. O cooldown evita repetição excessiva. O token do bot e o canal permanecem somente no `.env`.
+
+## 14. Golden Dataset, DeepEval e avaliação da qualidade
+
+A Etapa 2 separa três níveis de avaliação: testes determinísticos, golden dataset e julgamento semântico com DeepEval.
+
+### 14.1 Golden Dataset
+
+O arquivo `evals/golden_dataset.jsonl` contém 25 casos sintéticos do domínio, cobrindo:
+
+- perguntas documentais sobre políticas, cargos e trilhas;
+- indicadores estruturados e catálogo de treinamentos;
+- consultas de competência com IDs explícitos;
+- smalltalk;
+- comparação documental;
+- recomendações de trilhas ML;
+- análise de lacunas;
+- recomendações de treinamento;
+- política e reembolso;
+- multi-turno;
+- perguntas ambíguas;
+- ausência de evidência;
+- prompt injection;
+- PII e salário individual;
+- SQL destrutivo;
+- solicitações fora do escopo.
+
+Cada caso registra, quando aplicável:
+
+- identificador;
+- categoria;
+- pergunta;
+- rota esperada;
+- ferramentas esperadas;
+- fatos esperados;
+- documentos esperados;
+- IDs esperados;
+- indicação de bloqueio;
+- observações de avaliação.
+
+A validação offline executada por `scripts/evaluate-ai.py` verifica schema, rota e bloqueio sem consumir tokens. O dataset também funciona como contrato de regressão: uma alteração no roteador ou nos guardrails deve ser comparada contra os mesmos casos antes de ser considerada estável.
+
+Além do golden geral, `evals/rag_goldens.jsonl` contém casos com resposta, contexto e ground truth para avaliação semântica da qualidade RAG.
+
+### 14.2 DeepEval
+
+O módulo `src/evaluation_ai.py` integra o DeepEval como LLM-as-a-judge. O runner live é explícito e não é acionado pelo `pytest` nem pelo caminho normal do Streamlit, porque pode consumir tokens do LM Studio.
+
+As métricas avaliadas são:
+
+- **Faithfulness:** verifica se a resposta está apoiada no contexto recuperado;
+- **Answer Relevancy:** verifica se a resposta responde à pergunta sem desvios;
+- **Contextual Precision:** verifica se os contextos relevantes estão bem priorizados;
+- **Contextual Recall:** verifica se o contexto contém evidência suficiente para o ground truth.
+
+O adapter `src/deepeval_judge.py` usa o endpoint OpenAI-compatible do LM Studio. O comando live exige confirmação explícita:
+
+```bash
+make evaluate-ai-live
+```
+
+O runner utiliza `--yes-live` e seleciona apenas os casos que possuem resposta, contexto e ground truth. O relatório gerado fica em `output/evaluation/live_ai_report.json`, diretório ignorado pelo Git.
+
+A avaliação executada localmente dos casos RAG demonstrou respostas com alta faithfulness e relevancy para as perguntas testadas. Ainda assim, o judge é uma evidência complementar, não uma verdade absoluta: resultados dependem do modelo avaliador, do prompt e do contexto fornecido.
+
+### 14.3 Interpretação e melhorias
+
+Os resultados devem ser interpretados junto com os testes determinísticos. Uma resposta pode estar na rota correta e ainda ser pouco fiel ao contexto. Por isso, as melhorias devem considerar:
+
+- ajustar separadores e tamanho de chunks no Dify;
+- revisar Top K e ausência de evidência;
+- adicionar casos ambíguos e fora do escopo;
+- comparar fontes recuperadas antes e depois de mudanças;
+- revisar respostas com baixa faithfulness ou relevancy;
+- separar novamente perguntas que deveriam ir para DuckDB ou ML;
+- manter a política como fonte normativa em caso de conflito;
+- registrar latência e custo de cada experimento.
+
+## 15. Melhorias complementares de produto e interface
+
+A Etapa 2 não se limitou ao treinamento do modelo. Foram implementadas melhorias transversais para tornar o sistema demonstrável, auditável e mais útil aos três perfis do Streamlit.
+
+### 15.1 Experiência de currículo
+
+O upload de PDF ocorre no chat principal. O usuário recebe aviso de privacidade antes do upload, confirmação de recebimento e aviso de que a análise pode levar até cinco minutos. Durante a execução, o painel de progresso apresenta etapas como:
+
+```text
+Currículo recebido
+→ texto/OCR extraído
+→ análise estruturada
+→ agentes especializados
+→ resposta final
+```
+
+A resposta apresenta competências em tabela/cards com:
+
+- nome;
+- nível de senioridade;
+- confiança;
+- evidência;
+- competências não reconhecidas;
+- informações ausentes ou que exigem confirmação.
+
+O painel de erro técnico seguro mostra categoria, rota, Trace ID, tempo decorrido e próxima ação sem expor chaves, currículo, PII ou stack trace.
+
+### 15.2 Visão do gestor
+
+A área `Visão do gestor` permanece agregada e usa somente dados sintéticos. A Etapa 2 adicionou:
+
+- cards de competências avaliadas, funcionários com lacuna, lacunas críticas, taxa de aprovação e nota média;
+- distinção entre lacunas críticas e comuns;
+- indicadores de treinamentos, aprovação, nota, horas associadas, reprovações e custo de catálogo;
+- filtros por categoria, competência e modalidade;
+- gráficos de aprovados versus reprovados;
+- gráficos de lacunas críticas versus comuns;
+- evolução temporal mensal de registros de treinamento e lacunas;
+- explicação de cada indicador em linguagem simples.
+
+A implementação não inventa indicadores por departamento ou gestor porque o dataset não possui uma tabela-mestre organizacional confiável. Essa limitação é explicitada na interface e na documentação.
+
+### 15.3 Perfil Desenvolvedor
+
+O perfil Desenvolvedor possui áreas separadas para:
+
+- Machine Learning;
+- Observabilidade;
+- Qualidade e Evals.
+
+Na aba ML, o Desenvolvedor pode consultar:
+
+- métricas de validação e teste;
+- alerta de queda de generalização;
+- cobertura das competências de entrada;
+- competências reconhecidas e não reconhecidas;
+- incerteza da recomendação;
+- explicações locais e globais quando suportadas;
+- status explícito quando SHAP/importância não estiver disponível;
+- limitações de fairness e ausência de atributos protegidos autorizados.
+
+Na aba Observabilidade, pode analisar traces sanitizados, serviços, agentes, tarefas, consumo e erros. Na aba Qualidade e Evals, pode consultar o Golden Dataset e os relatórios offline/live.
+
+### 15.4 Privacidade, segurança e governança
+
+Foram reforçados:
+
+- redação de CPF, RG, e-mail, telefone e outros identificadores;
+- proibição de decisões de contratação, promoção, remuneração, punição ou desligamento;
+- separação entre texto de currículo e perfil estruturado;
+- não persistência de currículo bruto;
+- least privilege por agente;
+- consultas DuckDB read-only;
+- output gate de toxicidade;
+- painel de reasoning estruturado público, sem chain-of-thought privado.
+
+## 16. Qualidade de código, ambiente e rastreabilidade
+
+A Etapa 2 também consolidou práticas de manutenção:
+
+- Python 3.11 como runtime oficial único em `.venv`;
+- CrewAI integrado ao ambiente principal;
+- `.python-version` para tornar a versão explícita;
+- módulos separados para OCR, privacidade, progresso, erros, reasoning, XAI e UI;
+- testes unitários e de integração com mocks;
+- `requirements-dev.txt`;
+- hooks pre-commit com Black, Ruff, AST, JSON, YAML e detecção de chaves;
+- CI no GitHub Actions com instalação, `pip check`, compilação e pytest;
+- Dependabot para atualizações controladas;
+- `VERSION` e `CHANGELOG.md` para rastreabilidade;
+- release automatizado por tags SemVer;
+- exclusão de ambientes, bases, logs, modelos e segredos pelo `.gitignore`.
+
+Os serviços externos continuam separados: Dify, Weaviate, PostgreSQL, Redis e proxies executam em Docker; Streamlit, CrewAI, OCR, ML e clientes JEV/Dify executam no `.venv` oficial; LM Studio permanece no host.
+
+## 17. Limitações e avaliação honesta da Etapa 2
+
+A Etapa 2 é funcional e reproduzível em ambiente local, mas ainda possui limitações importantes:
+
+- o dataset O*NET filtrado é pequeno;
+- o desempenho no teste é inferior ao observado na validação;
+- as trilhas são agrupamentos do projeto, não rótulos oficiais do O*NET;
+- o mercado brasileiro não é representado integralmente;
+- a fairness entre grupos protegidos não é avaliável sem atributos autorizados;
+- o Langfuse é opcional e depende de credenciais para uma demonstração externa;
+- tokens e custo local podem não estar disponíveis em todos os providers;
+- o DeepEval live avalia um subconjunto controlado do Golden Dataset;
+- o CrewAI depende da capacidade do modelo local de seguir contratos estruturados;
+- não há autenticação ou RBAC real;
+- os indicadores gerenciais são sintéticos e agregados.
+
+Essas limitações não são ocultadas. Elas orientam os próximos experimentos: ampliar o dataset, realizar divisão por grupos ocupacionais, avaliar com especialistas, formalizar evidências de tracing, expandir o conjunto DeepEval e manter revisão humana.
+
+## 18. Próximos passos
+
+- aumentar e diversificar o catálogo de ocupações e competências;
+- adicionar fontes licenciadas específicas de IA generativa;
+- avaliar o modelo com especialistas de RH e tecnologia;
+- melhorar o mapeamento de aliases e sinônimos;
+- realizar divisão por grupos ocupacionais relacionados;
+- criar explicações de lacunas mais fiéis às competências observadas;
+- adicionar versionamento formal dos datasets e modelos;
+- manter revisão humana e governança antes de qualquer uso organizacional.
+
+Este documento descreve a Etapa 2 como continuação da fundação conversacional da Etapa 1. A Etapa 3 permanece fora do escopo desta entrega.
+
+## 19. Próximos passos
 
 - aumentar e diversificar o catálogo de ocupações e competências;
 - adicionar fontes licenciadas específicas de IA generativa;

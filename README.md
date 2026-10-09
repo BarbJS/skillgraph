@@ -66,6 +66,7 @@ O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura fun
 | --- | --- |
 | Entender a Etapa 1 | 📖 [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md) |
 | Entender a Etapa 2 de ML | 📖 [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md) |
+| Ler o relatório técnico da Etapa 2 | 📄 [Relatório técnico — Etapa 2](docs/evaluation-etapa2.md) |
 | Executar o projeto localmente | 🚀 [Como executar em uma máquina nova](#-como-executar-em-uma-máquina-nova) |
 | Configurar Dify e LM Studio | 🧩 [Configuração do LM Studio no Dify](docs/model-setup.md) |
 | Entender o RAG | 📚 [Pipeline Dify + Weaviate](#-arquitetura-em-uma-visão) |
