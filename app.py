@@ -1207,7 +1207,7 @@ if question or uploaded_files:
                         role=role,
                     )
                     agent_handled = True
-                elif agent_status == "disabled":
+                elif agent_status in {"disabled", "error"}:
                     use_agent_runtime = False
                     trace.route = route.intent.value
                     progress.info(
