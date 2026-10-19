@@ -64,6 +64,76 @@ def task_step(
     return step(stage, summary, status=status, tool=tool)
 
 
+_AGENT_STEP_SPECS: dict[str, tuple[str, str | None]] = {
+    "Core Router": (
+        "Classificou a mensagem, confirmou a rota e coordenou os handoffs.",
+        "Core Router",
+    ),
+    "Resume Interpreter": (
+        "Interpretou o currículo sanitizado e preservou as evidências estruturadas.",
+        "OCR/PyMuPDF + JEV (backend)",
+    ),
+    "Profile Normalizer": (
+        "Normalizou aliases, níveis, evidências e removeu PII do perfil.",
+        None,
+    ),
+    "Prediction Specialist": (
+        "Executou a recomendação de trilhas e as explicações do modelo.",
+        "CompetencyRecommendationTool",
+    ),
+    "Gap Analyst": (
+        "Interpretou as prioridades e organizou as lacunas de desenvolvimento.",
+        None,
+    ),
+    "Learning Path & Training Recommendation Agent": (
+        "Consultou treinamentos existentes e verificou pré-requisitos.",
+        "TrainingCatalogTool",
+    ),
+    "Policy Specialist": (
+        "Consultou a política documental e preservou as fontes recuperadas.",
+        "DifyPolicyTool",
+    ),
+    "Structured Data Specialist": (
+        "Consultou o indicador autorizado em dados estruturados.",
+        "TrainingCatalogTool",
+    ),
+    "Safety Reviewer": (
+        "Validou schema, escopo, PII, evidência e necessidade de revisão humana.",
+        "Safety Reviewer",
+    ),
+    "Response Synthesizer": (
+        "Transformou os handoffs revisados em uma resposta contextualizada.",
+        "Response Synthesizer",
+    ),
+}
+
+
+def agent_execution_steps(
+    route: str,
+    *,
+    completed_task_count: int | None = None,
+    core_decision: Any = None,
+) -> list[dict[str, Any]]:
+    """Describe only the public agents completed by a CrewAI route."""
+    from src.agents.crew import route_agent_roles
+
+    roles = list(route_agent_roles(route))
+    if completed_task_count is not None:
+        roles = roles[: max(0, min(completed_task_count, len(roles)))]
+    steps: list[dict[str, Any]] = []
+    for role in roles:
+        if role == "Core Router" and core_decision is not None:
+            public_decision = core_decision_step(core_decision)
+            if public_decision is not None:
+                steps.append(public_decision)
+                continue
+        summary, tool = _AGENT_STEP_SPECS.get(
+            role, ("Concluiu a etapa especializada da rota.", role)
+        )
+        steps.append(task_step(role, tool=tool, summary=summary))
+    return sanitize_steps(steps)
+
+
 def sanitize_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep only the public reasoning schema and remove private fields."""
     result: list[dict[str, Any]] = []
@@ -109,25 +179,22 @@ def route_steps(route: str) -> list[dict[str, Any]]:
 
     if route == "rag":
         return [
-            step("Core Router", "Classificou a solicitação como pergunta documental.", tool="Core Router"),
-            step("Policy Specialist", "Consultou o Chatflow Dify para recuperar evidências.", tool="DifyPolicyTool"),
-            step("Dify/Weaviate", "Recuperou contexto documental para fundamentar a resposta.", tool="Dify/Weaviate"),
-            step("Safety Reviewer", "Verificou escopo, evidência e ausência de dados sensíveis.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Organizou a resposta final em linguagem natural.", tool="Response Synthesizer"),
+            step("Roteamento legado", "Classificou a solicitação como pergunta documental; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("Dify/Weaviate", "Recuperou contexto documental e produziu a resposta pelo Chatflow.", tool="Dify/Weaviate"),
+            step("Resposta final", "Apresentou a resposta e as fontes recuperadas.", tool="Streamlit"),
         ]
     if route == "comparison":
         return [
-            step("Core Router", "Selecionou a comparação documental.", tool="Core Router"),
-            step("Policy Specialist", "Recuperou evidências documentais para os níveis solicitados.", tool="DifyPolicyTool"),
-            step("Comparison", "Comparou os valores extraídos sem inventar dados.", tool="Dify/Weaviate"),
-            step("Response Synthesizer", "Apresentou a comparação e suas fontes.", tool="Response Synthesizer"),
+            step("Roteamento legado", "Selecionou a comparação documental; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("Dify/Weaviate", "Recuperou as evidências documentais para os níveis solicitados.", tool="Dify/Weaviate"),
+            step("Comparação", "Comparou os valores extraídos sem inventar dados.", tool="comparison"),
+            step("Resposta final", "Apresentou a comparação e suas fontes.", tool="Streamlit"),
         ]
     if route == "sql_indicator":
         return [
-            step("Core Router", "Classificou a solicitação como indicador estruturado.", tool="Core Router"),
-            step("Structured Data Specialist", "Consultou funções permitidas no DuckDB.", tool="TrainingCatalogTool"),
-            step("Safety Reviewer", "Verificou que o resultado é agregado e read-only.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Organizou o indicador para apresentação.", tool="Response Synthesizer"),
+            step("Roteamento legado", "Classificou a solicitação como indicador; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("DuckDB", "Consultou funções read-only e retornou dados agregados.", tool="DuckDB read-only"),
+            step("Resposta final", "Organizou o indicador para apresentação.", tool="Streamlit"),
         ]
     if route == "training_recommendation":
         return [

@@ -21,7 +21,7 @@ from src.dify_client import DifyClient
 from src.jev_client import JevClient
 from src.sql_tools import SkillGraphDatabase
 from src.privacy import redact_text, sanitize
-from src.reasoning import core_decision_step, sanitize_steps, task_step
+from src.reasoning import agent_execution_steps, core_decision_step, sanitize_steps, task_step
 from src.resume_profile import extract_profile, render_profile
 
 
@@ -196,44 +196,16 @@ def run_agent_turn(
         if route == AgentRoute.RESUME:
             jev = None
 
-        reasoning_steps = [
-            core_decision_step(
-                getattr(result, "tasks_output", [None])[0]
-                if getattr(result, "tasks_output", None)
-                else None
-            )
-        ]
-        reasoning_steps = [item for item in reasoning_steps if item]
-        roles = (
-            ["Resume Interpreter", "Profile Normalizer"]
-            if route == AgentRoute.RESUME
-            else []
+        tasks_output = getattr(result, "tasks_output", None) or []
+        core_output = tasks_output[0] if tasks_output else None
+        reasoning_steps = agent_execution_steps(
+            route.value,
+            completed_task_count=len(tasks_output),
+            core_decision=core_output,
         )
-        tool_by_role = {
-            "Resume Interpreter": "JevResumeExtractionTool",
-            "Prediction Specialist": "CompetencyRecommendationTool",
-            "Learning Path & Training Recommendation Agent": "TrainingCatalogTool",
-            "Policy Specialist": "DifyPolicyTool",
-            "Structured Data Specialist": "TrainingCatalogTool",
-        }
-        if route == AgentRoute.ML:
-            roles = ["Prediction Specialist"]
-        elif route == AgentRoute.GAP:
-            roles = ["Gap Analyst"]
-        elif route == AgentRoute.TRAINING:
-            roles = ["Learning Path & Training Recommendation Agent"]
-        elif route == AgentRoute.POLICY:
-            roles = ["Policy Specialist"]
-        elif route == AgentRoute.STRUCTURED:
-            roles = ["Structured Data Specialist"]
-        for role in roles:
-            reasoning_steps.append(task_step(role, tool=tool_by_role.get(role, role)))
-        reasoning_steps.extend(
-            [
-                task_step("Safety Reviewer", tool="Safety Reviewer"),
-                task_step("Response Synthesizer", tool="Response Synthesizer"),
-            ]
-        )
+        if not reasoning_steps:
+            reasoning_steps = agent_execution_steps(route.value)
+        reasoning_steps = sanitize_steps(reasoning_steps)
         return {
             "status": "completed",
             "route": route.value,
