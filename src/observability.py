@@ -164,13 +164,31 @@ class ObservabilityStore:
         self.traces = []
         self.alert_manager = AlertManager()
         self._langfuse = None
+        self._langfuse_error = None
         if _enabled():
             try:
                 from langfuse import Langfuse
 
                 self._langfuse = Langfuse()
-            except Exception:
-                self._langfuse = None
+            except Exception as exc:
+                self._langfuse_error = self._safe_langfuse_error(exc)
+
+    @staticmethod
+    def _safe_langfuse_error(exc: Exception) -> str:
+        """Return a useful SDK error without exposing credentials."""
+        message = str(exc)
+        for key in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"):
+            secret = os.getenv(key, "")
+            if secret:
+                message = message.replace(secret, "[redacted]")
+        return f"{type(exc).__name__}: {message[:300]}"
+
+    def langfuse_status(self) -> dict[str, Any]:
+        return {
+            "enabled": _enabled(),
+            "initialized": self._langfuse is not None,
+            "error": self._langfuse_error,
+        }
 
     def record(self, trace):
         summary = trace.summary()
@@ -244,8 +262,8 @@ class ObservabilityStore:
                 child.end()
             root.end()
             self._langfuse.flush()
-        except Exception:
-            pass
+        except Exception as exc:
+            self._langfuse_error = self._safe_langfuse_error(exc)
 
     def record_feedback(self, *, trace_id, message_id, rating, route):
         for t in self.traces:

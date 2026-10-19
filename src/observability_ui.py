@@ -10,6 +10,14 @@ from src.observability import OBSERVABILITY
 def render_observability() -> None:
     st.header("Observabilidade e métricas")
     st.caption("Painel técnico local com traces sanitizados e métricas agregadas.")
+    langfuse_status = OBSERVABILITY.langfuse_status()
+    if langfuse_status["enabled"] and not langfuse_status["initialized"]:
+        st.error(
+            "Langfuse habilitado, mas não inicializado. "
+            f"Diagnóstico: {langfuse_status['error'] or 'erro não informado'}"
+        )
+    elif langfuse_status["initialized"]:
+        st.success("Langfuse inicializado para envio de traces sanitizados.")
     if st.button("Atualizar traces", key="refresh-observability"):
         st.rerun()
 
