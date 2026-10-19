@@ -54,10 +54,14 @@ def core_decision_step(value: Any) -> dict[str, Any] | None:
 
 
 def task_step(
-    stage: str, *, tool: str | None = None, status: str = "completed"
+    stage: str,
+    *,
+    tool: str | None = None,
+    status: str = "completed",
+    summary: str = "A etapa estruturada foi concluída.",
 ) -> dict[str, Any]:
-    """Create a generic public task summary without model output."""
-    return step(stage, "A etapa estruturada foi concluída.", status=status, tool=tool)
+    """Create a public task summary without exposing model reasoning."""
+    return step(stage, summary, status=status, tool=tool)
 
 
 def sanitize_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -101,52 +105,52 @@ def step(
 
 
 def route_steps(route: str) -> list[dict[str, Any]]:
-    """Describe the deterministic route selected for a normal chat turn."""
+    """Describe the public sequential pipeline selected for a normal chat turn."""
 
+    if route == "rag":
+        return [
+            step("Core Router", "Classificou a solicitação como pergunta documental.", tool="Core Router"),
+            step("Policy Specialist", "Consultou o Chatflow Dify para recuperar evidências.", tool="DifyPolicyTool"),
+            step("Dify/Weaviate", "Recuperou contexto documental para fundamentar a resposta.", tool="Dify/Weaviate"),
+            step("Safety Reviewer", "Verificou escopo, evidência e ausência de dados sensíveis.", tool="Safety Reviewer"),
+            step("Response Synthesizer", "Organizou a resposta final em linguagem natural.", tool="Response Synthesizer"),
+        ]
+    if route == "comparison":
+        return [
+            step("Core Router", "Selecionou a comparação documental.", tool="Core Router"),
+            step("Policy Specialist", "Recuperou evidências documentais para os níveis solicitados.", tool="DifyPolicyTool"),
+            step("Comparison", "Comparou os valores extraídos sem inventar dados.", tool="Dify/Weaviate"),
+            step("Response Synthesizer", "Apresentou a comparação e suas fontes.", tool="Response Synthesizer"),
+        ]
+    if route == "sql_indicator":
+        return [
+            step("Core Router", "Classificou a solicitação como indicador estruturado.", tool="Core Router"),
+            step("Structured Data Specialist", "Consultou funções permitidas no DuckDB.", tool="TrainingCatalogTool"),
+            step("Safety Reviewer", "Verificou que o resultado é agregado e read-only.", tool="Safety Reviewer"),
+            step("Response Synthesizer", "Organizou o indicador para apresentação.", tool="Response Synthesizer"),
+        ]
+    if route == "training_recommendation":
+        return [
+            step("Core Router", "Selecionou a rota de recomendação de treinamentos.", tool="Core Router"),
+            step("Learning Path & Training Recommendation Agent", "Consultou cursos e pré-requisitos permitidos.", tool="TrainingCatalogTool"),
+            step("Safety Reviewer", "Validou cursos existentes, escopo e evidências.", tool="Safety Reviewer"),
+            step("Response Synthesizer", "Redigiu a recomendação final.", tool="Response Synthesizer"),
+        ]
+    if route == "policy_rag":
+        return [
+            step("Core Router", "Selecionou a rota de política documental.", tool="Core Router"),
+            step("Policy Specialist", "Consultou a política pelo Chatflow Dify.", tool="DifyPolicyTool"),
+            step("Safety Reviewer", "Verificou fontes, escopo e ausência de decisão indevida.", tool="Safety Reviewer"),
+            step("Response Synthesizer", "Redigiu a resposta baseada na política.", tool="Response Synthesizer"),
+        ]
     labels = {
-        "smalltalk": (
-            "Resposta local",
-            "A mensagem foi reconhecida como uma interação simples.",
-        ),
-        "comparison": (
-            "Comparação documental",
-            "A solicitação foi encaminhada para comparação de evidências documentais.",
-        ),
-        "competency_lookup": (
-            "Consulta estruturada",
-            "A solicitação foi encaminhada para uma consulta read-only de competência.",
-        ),
-        "sql_indicator": (
-            "Indicador estruturado",
-            "A solicitação foi encaminhada para um indicador permitido.",
-        ),
-        "rag": (
-            "RAG documental",
-            "A solicitação foi encaminhada ao Chatflow documental.",
-        ),
-        "blocked": (
-            "Guardrail",
-            "A solicitação foi interrompida antes de acessar ferramentas.",
-        ),
-        "training_recommendation": (
-            "Learning Path & Training Recommendation Agent",
-            "A rota multiagente consultou o catálogo de treinamentos permitido.",
-        ),
-        "policy_rag": (
-            "Policy Specialist",
-            "A rota multiagente consultou a política pelo Chatflow Dify.",
-        ),
+        "smalltalk": ("Resposta local", "Reconheceu uma interação simples sem ferramenta externa."),
+        "competency_lookup": ("Consulta estruturada", "Consultou uma competência autorizada em modo read-only."),
+        "blocked": ("Guardrail", "Interrompeu a solicitação antes de acessar ferramentas."),
     }
-    label, summary = labels.get(
-        route, ("Roteamento", "A solicitação foi encaminhada para o fluxo apropriado.")
-    )
-    tool = {
-        "competency_lookup": "DuckDB read-only",
-        "sql_indicator": "DuckDB read-only",
-        "rag": "Dify/Weaviate",
-        "comparison": "Dify/Weaviate",
-    }.get(route)
+    label, summary = labels.get(route, ("Roteamento", "Encaminhou a solicitação para o fluxo apropriado."))
+    tool = {"competency_lookup": "DuckDB read-only"}.get(route)
     return [
-        step("Roteamento", summary, tool=tool),
-        step(label, "O fluxo especializado foi executado.", tool=tool),
+        step("Core Router", summary, tool="Core Router"),
+        step(label, "Executou a etapa pública correspondente.", tool=tool),
     ]

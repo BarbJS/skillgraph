@@ -52,6 +52,29 @@ def test_public_reasoning_contains_no_private_thought_field():
 
 def test_route_steps_are_safe_public_summaries():
     steps = route_steps("rag")
-    assert steps
+    assert [item["stage"] for item in steps] == [
+        "Core Router",
+        "Policy Specialist",
+        "Dify/Weaviate",
+        "Safety Reviewer",
+        "Response Synthesizer",
+    ]
     assert all("summary" in item for item in steps)
     assert all("chain" not in item["summary"].lower() for item in steps)
+
+
+def test_multiagent_route_steps_list_agents_in_order():
+    steps = route_steps("training_recommendation")
+    assert [item["stage"] for item in steps] == [
+        "Core Router",
+        "Learning Path & Training Recommendation Agent",
+        "Safety Reviewer",
+        "Response Synthesizer",
+    ]
+    assert steps[1]["tool"] == "TrainingCatalogTool"
+
+
+def test_route_steps_do_not_expose_private_reasoning():
+    steps = route_steps("policy_rag")
+    assert all("thought" not in item and "prompt" not in item for item in steps)
+    assert steps[1]["tool"] == "DifyPolicyTool"
