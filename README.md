@@ -21,12 +21,6 @@ O objetivo do SkillGraph é transformar a gestão de competências e a aprendiza
 
 > **Assistente de competências e aprendizagem corporativa** para a NexaTech — uma empresa fictícia de tecnologia e serviços.
 
-<div align="center">
-
-**RAG** · **LLM local** · **DuckDB** · **Streamlit** · **Segurança**
-
-</div>
-
 O **SkillGraph** transforma documentos, dados estruturados e modelos de linguagem locais em uma experiência conversacional para consultar políticas de treinamento, entender requisitos de cargos, identificar lacunas de competências e explorar possibilidades de desenvolvimento profissional.
 
 ## 🔄 Como o SkillGraph funciona
@@ -46,18 +40,6 @@ Pergunta: Quantas horas de treinamento um funcionário sênior deve realizar por
 
 O sistema valida a pergunta, identifica uma intenção documental, envia a solicitação ao Chatflow do Dify, recupera os trechos relevantes da política de treinamentos no Weaviate, encaminha o contexto ao LM Studio e retorna a resposta em streaming com a fonte utilizada.
 
-### Exemplo de pergunta estruturada
-
-```text
-Pergunta: Quais competências têm mais lacunas?
-```
-
-Nesse caso, o roteador não envia a pergunta para o RAG. Uma função de leitura consulta o DuckDB, compara o nível atual com o nível obrigatório e retorna um indicador agregado por competência.
-
-> ✨ **Em uma frase:** uma pergunta em linguagem natural percorre a fonte mais adequada — documentos, dados relacionais ou uma ferramenta especializada — e retorna uma resposta explicável, com fontes, tabelas ou indicadores quando aplicável.
-
-O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura funcional e reproduzível. A aplicação combina infraestrutura local, recuperação aumentada por geração, consultas analíticas determinísticas, guardrails e uma interface orientada à experiência do usuário.
-
 > ⚠️ **Aviso importante:** os dados da NexaTech são sintéticos. O protótipo não substitui decisões de RH, avaliação humana, autenticação corporativa ou políticas reais de privacidade.
 
 ## 🧭 Comece por aqui
@@ -65,7 +47,7 @@ O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura fun
 | Se você quer... | Comece por... |
 | --- | --- |
 | Entender a Etapa 1 | 📖 [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md) |
-| Entender a Etapa 2 de ML | 📖 [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md) |
+| Entender a Etapa 2 | 📖 [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md) |
 | Ler o relatório técnico da Etapa 2 | 📄 [Relatório técnico — Etapa 2](docs/evaluation-etapa2.md) |
 | Executar o projeto localmente | 🚀 [Como executar em uma máquina nova](#-como-executar-em-uma-máquina-nova) |
 | Configurar Dify e LM Studio | 🧩 [Configuração do LM Studio no Dify](docs/model-setup.md) |
@@ -86,26 +68,12 @@ O projeto foi pensado para um contexto acadêmico, mas segue uma arquitetura fun
 
 - 💬 Chat em linguagem natural com respostas em português e streaming.
 - 📚 RAG sobre políticas, descrições de cargos, trilhas e FAQ de desenvolvimento.
-- 🔎 RAG com Dify e o armazenamento vetorial gerenciado pelo próprio Dify.
-- 🧮 Consultas analíticas em DuckDB sobre CSVs relacionais.
+- 🔎 RAG com Dify e o armazenamento vetorial gerenciado pelo Weaviate.
+- 🧮 Consultas analíticas no DuckDB sobre CSVs relacionais.
 - 🛡️ Bloqueio de PII, salário individual, SQL destrutivo e tentativas de prompt injection.
 - 📊 Indicadores agregados, tabelas, gráficos, fontes recuperadas e métricas locais.
 - 🧑‍💼 Experiências simuladas para desenvolvedor, gestor e RH.
-- 🧪 Testes automatizados e dataset dourado para avaliar o roteamento.
-
-## 📌 Estado atual da Etapa 1
-
-| Área | Situação |
-| --- | --- |
-| Interface conversacional | ✅ Streamlit com histórico, streaming, fontes e feedback |
-| RAG | ✅ Dify Chatflow + Weaviate gerenciado pelo Dify |
-| ML de competências (Etapa 2) | ✅ O*NET 31.0 + FLAML, com recomendações para colaboradores descritos por RH |
-| System prompt | ✅ Contextualizado para RH e aprendizagem corporativa |
-| Dados estruturados | ✅ DuckDB sobre cinco CSVs sintéticos |
-| Segurança | ✅ Guardrails para PII, prompt injection e SQL destrutivo |
-| Observabilidade | ✅ Métricas locais e logs minimizados |
-| Machine Learning | ✅ Recomendação de trilhas e competências com FLAML + O*NET |
-| Autenticação real | 🧭 Fora do escopo do MVP |
+- 🧪 Testes automatizados e golden dataset para avaliar o roteamento.
 
 ## 🎯 Problema de negócio
 
@@ -447,17 +415,7 @@ docker compose down -v
 
 O SkillGraph é um MVP acadêmico funcional. Antes de um uso real, seria necessário implementar autenticação corporativa, autorização por perfil, política de retenção, armazenamento protegido, observabilidade centralizada, revisão humana formal e testes de carga. Também estão planejados uma tabela organizacional mais completa, integração com ferramentas corporativas, evolução da busca híbrida e ampliação do catálogo de competências de IA generativa.
 
-## 📚 Documentação e leitura adicional
-
-### 📖 Documentação detalhada
-
-Para entender o CBL, a evolução técnica completa, as conclusões e os próximos passos possíveis — desde a integração entre Docker, LM Studio e Dify até a incorporação de Streamlit, DuckDB, UX writing, segurança e observabilidade — leia:
-
-➡️ **[Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md)**
-
-Esse documento reúne a explicação aprofundada que acompanha esta entrega e serve como base para o PDF/documentação final do projeto.
-
-### 🧰 Guias operacionais
+## 🧰 Guias operacionais
 
 - [Configuração do LM Studio no Dify](docs/model-setup.md)
 - [Machine Learning de competências](docs/ml-traditional.md)
@@ -473,11 +431,3 @@ Esse documento reúne a explicação aprofundada que acompanha esta entrega e se
 - [Observabilidade](docs/observability.md)
 - [Alertas Slack](docs/slack-alerts.md)
 - [Avaliação robusta de IA](docs/evaluation-ai.md)
-
-## 🎓 Contexto acadêmico e autoria
-
-Este é um projeto em desenvolvimento na disciplina **AI Factory: Building Intelligent Systems**, do curso de graduação em Inteligência Artificial da **PUCPR (2026)**. O trabalho é orientado pelo **Professor Wellington Rodrigo Monteiro** e foi desenvolvido pela aluna **Bárbara Jaeger Specian**, com assistência de Inteligência Artificial.
-
-O projeto responde à pergunta: **como uma organização pode identificar lacunas de competências e recomendar trilhas de aprendizagem personalizadas na era da IA generativa?** A solução combina recuperação fundamentada em documentos, análise determinística de dados estruturados, um system prompt contextualizado e uma experiência conversacional orientada por transparência.
-
-O deploy público e as integrações corporativas permanecem como evolução posterior. A entrega demonstra uma base local, funcional, explicável e reproduzível para apoiar o desenvolvimento profissional com responsabilidade, incluindo a recomendação ML de trilhas baseada no O*NET.
