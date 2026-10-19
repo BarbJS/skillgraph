@@ -163,6 +163,9 @@ class ObservabilityStore:
     def __init__(self):
         self.traces = self._load_local_traces()
         self.alert_manager = AlertManager()
+        self._langfuse = None
+        self._langfuse_error = None
+        self._initialize_langfuse()
 
     @staticmethod
     def _load_local_traces() -> list[dict[str, Any]]:
@@ -181,13 +184,7 @@ class ObservabilityStore:
             return []
         return traces[-500:]
 
-    def refresh(self) -> None:
-        """Reload local trace history after a Streamlit rerun."""
-        known = {str(item.get("trace_id")) for item in self.traces}
-        for summary in self._load_local_traces():
-            if str(summary.get("trace_id")) not in known:
-                self.traces.append(summary)
-        self.traces = self.traces[-500:]
+    def _initialize_langfuse(self) -> None:
         self._langfuse = None
         self._langfuse_error = None
         if _enabled():
@@ -197,6 +194,14 @@ class ObservabilityStore:
                 self._langfuse = Langfuse()
             except Exception as exc:
                 self._langfuse_error = self._safe_langfuse_error(exc)
+
+    def refresh(self) -> None:
+        """Reload local trace history after a Streamlit rerun."""
+        known = {str(item.get("trace_id")) for item in self.traces}
+        for summary in self._load_local_traces():
+            if str(summary.get("trace_id")) not in known:
+                self.traces.append(summary)
+        self.traces = self.traces[-500:]
 
     @staticmethod
     def _safe_langfuse_error(exc: Exception) -> str:
