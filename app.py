@@ -822,7 +822,7 @@ if role == UserRole.GESTOR.value and gestor_view == "Visão do gestor":
                     "funcionarios_com_deficit": "Pessoas com déficit",
                     "lacunas_criticas": "Lacunas críticas",
                     "lacunas_comuns": "Lacunas comuns",
-                    "percentual_critico": "% crítica",
+                    "percentual_critico": "% avaliações críticas",
                 }
             )
             st.dataframe(gap_table, hide_index=True, use_container_width=True)

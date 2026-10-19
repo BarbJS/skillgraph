@@ -168,16 +168,32 @@ class SkillGraphDatabase:
         return self.query(
             """SELECT
                 c.nome AS competencia,
-                COUNT(DISTINCT fc.funcionario_id) AS funcionarios_com_deficit,
-                COUNT(*) FILTER (WHERE CAST(fc.risco_lacuna_critica AS INTEGER) = 1) AS lacunas_criticas,
-                COUNT(*) FILTER (WHERE CAST(fc.risco_lacuna_critica AS INTEGER) <> 1) AS lacunas_comuns,
-                ROUND(100.0 * COUNT(*) FILTER (WHERE CAST(fc.risco_lacuna_critica AS INTEGER) = 1) / NULLIF(COUNT(*), 0), 1) AS percentual_critico
+                COUNT(DISTINCT fc.funcionario_id) FILTER (
+                    WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
+                ) AS funcionarios_com_deficit,
+                COUNT(*) FILTER (
+                    WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
+                      AND CAST(fc.risco_lacuna_critica AS INTEGER) = 1
+                ) AS lacunas_criticas,
+                COUNT(*) FILTER (
+                    WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
+                      AND CAST(fc.risco_lacuna_critica AS INTEGER) <> 1
+                ) AS lacunas_comuns,
+                ROUND(
+                    100.0 * COUNT(*) FILTER (
+                        WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
+                          AND CAST(fc.risco_lacuna_critica AS INTEGER) = 1
+                    ) / NULLIF(COUNT(*), 0),
+                    1
+                ) AS percentual_critico
             FROM funcionario_competencia fc
             JOIN competencias c ON c.competencia_id = fc.competencia_id
-            WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
-              AND (? IS NULL OR c.categoria = ?)
+            WHERE (? IS NULL OR c.categoria = ?)
               AND (? IS NULL OR c.nome = ?)
             GROUP BY c.nome
+            HAVING COUNT(*) FILTER (
+                WHERE CAST(fc.nivel_atual AS INTEGER) < CAST(fc.nivel_obrigatorio AS INTEGER)
+            ) > 0
             ORDER BY lacunas_criticas DESC, funcionarios_com_deficit DESC, competencia
             LIMIT 10""",
             max_rows=limit,

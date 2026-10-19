@@ -24,3 +24,5 @@ def test_gap_breakdown_separates_critical_and_common_gaps():
     assert all(row["lacunas_comuns"] >= 0 for row in rows)
     assert all("funcionario_id" not in row for row in rows)
     assert all(0 <= float(row["percentual_critico"]) <= 100 for row in rows)
+    assert any(float(row["percentual_critico"]) < 100 for row in rows)
+    assert rows[0]["percentual_critico"] == 34.5
