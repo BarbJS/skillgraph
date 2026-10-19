@@ -28,6 +28,38 @@ class ChatResult:
 
 
 
+def _usage_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
+    candidates = [event.get("usage"), event.get("metadata"), event.get("data")]
+    for candidate in candidates:
+        if isinstance(candidate, dict):
+            nested = candidate.get("usage")
+            if isinstance(nested, dict):
+                return nested
+            nested = candidate.get("llm_usage")
+            if isinstance(nested, dict):
+                return nested
+            metadata = candidate.get("metadata")
+            if isinstance(metadata, dict):
+                nested = metadata.get("usage") or metadata.get("llm_usage")
+                if isinstance(nested, dict):
+                    return nested
+            if any(
+                key in candidate
+                for key in (
+                    "prompt_tokens",
+                    "input_tokens",
+                    "completion_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                    "prompt_token_count",
+                    "completion_token_count",
+                    "total_token_count",
+                )
+            ):
+                return candidate
+    return {}
+
+
 def _usage_value(usage: Mapping[str, Any], *keys: str) -> int:
     for key in keys:
         value = usage.get(key)
@@ -37,41 +69,60 @@ def _usage_value(usage: Mapping[str, Any], *keys: str) -> int:
 
 
 def _cost_value(usage: Mapping[str, Any]) -> float:
-    for key in ("cost", "total_cost", "total_cost_usd"):
+    for key in ("cost", "total_cost", "total_cost_usd", "total_cost_usd"):
         value = usage.get(key)
         if isinstance(value, (int, float)):
             return float(value)
     return 0.0
 
 
-def _usage_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
-    candidates = [event.get("usage"), event.get("metadata"), event.get("data")]
-    for candidate in candidates:
-        if isinstance(candidate, dict):
-            nested = candidate.get("usage")
-            if isinstance(nested, dict):
-                return nested
-            if any(key in candidate for key in ("prompt_tokens", "input_tokens", "total_tokens")):
-                return candidate
-    return {}
+def _estimate_tokens(text: str) -> int:
+    """Conservative local estimate used only when provider usage is absent."""
+    return max(0, (len(text) + 3) // 4)
 
 
-def _set_span_usage(span: Any, usage: Mapping[str, Any]) -> None:
-    if not span or not usage:
+def _usage_from_response_headers(response: requests.Response) -> dict[str, Any]:
+    usage: dict[str, Any] = {}
+    headers = getattr(response, "headers", {}) or {}
+    for key, target in (
+        ("x-prompt-tokens", "prompt_tokens"),
+        ("x-input-tokens", "input_tokens"),
+        ("x-completion-tokens", "completion_tokens"),
+        ("x-output-tokens", "output_tokens"),
+        ("x-total-tokens", "total_tokens"),
+    ):
+        value = headers.get(key)
+        if value and value.isdigit():
+            usage[target] = int(value)
+    return usage
+
+
+def _set_span_usage(span: Any, usage: Mapping[str, Any], *, query: str = "", answer: str = "") -> None:
+    if not span:
         return
-    span.set_usage(
-        input_tokens=_usage_value(usage, "input_tokens", "prompt_tokens"),
-        output_tokens=_usage_value(usage, "output_tokens", "completion_tokens"),
-        cost=_cost_value(usage),
+    input_tokens = _usage_value(
+        usage,
+        "input_tokens",
+        "prompt_tokens",
+        "prompt_token_count",
     )
+    output_tokens = _usage_value(
+        usage,
+        "output_tokens",
+        "completion_tokens",
+        "completion_token_count",
+    )
+    usage_available = bool(input_tokens or output_tokens or usage.get("total_tokens"))
+    if not usage_available:
+        input_tokens = _estimate_tokens(query)
+        output_tokens = _estimate_tokens(answer)
+    cost = _cost_value(usage)
+    span.set_usage(input_tokens=input_tokens, output_tokens=output_tokens, cost=cost)
     span.metadata.update(
         {
-            "usage_available": True,
-            "cost_source": (
-                "provider_reported"
-                if _cost_value(usage)
-                else "local_or_unpriced"
-            ),
+            "usage_available": usage_available,
+            "usage_source": "provider_reported" if usage_available else "local_estimate",
+            "cost_source": "provider_reported" if cost else "local_or_unpriced",
         }
     )
 
@@ -106,6 +157,7 @@ class DifyClient:
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
         span = self.trace.span("dify.chat_stream", "dify", task_name="chat-messages") if self.trace else None
         self._last_usage: dict[str, Any] = {}
+        self._stream_answer = ""
         if span:
             span.__enter__()
         try:
@@ -117,10 +169,15 @@ class DifyClient:
                     raise DifyClientError("Endpoint do Chatflow não encontrado. Confirme que o app foi publicado e que DIFY_API_BASE_URL aponta para http://localhost.")
                 if response.status_code >= 400:
                     raise DifyClientError(f"O Dify retornou HTTP {response.status_code}: {_safe_error_detail(response)}")
+                header_usage = _usage_from_response_headers(response)
                 for event in _parse_sse(response.iter_lines(decode_unicode=True)):
+                    if event.get("event") == "message":
+                        self._stream_answer += str(event.get("answer", ""))
                     usage = _usage_from_event(event)
                     if usage:
                         self._last_usage = usage
+                    elif header_usage:
+                        self._last_usage = header_usage
                     yield event
         except requests.RequestException as exc:
             raise DifyClientError("Não foi possível conectar ao Dify local. Confirme se os containers estão ativos.") from exc
@@ -130,9 +187,15 @@ class DifyClient:
             raise DifyClientError("O streaming do Dify falhou durante o consumo da resposta.") from exc
         finally:
             if span:
-                _set_span_usage(span, getattr(self, "_last_usage", {}))
+                _set_span_usage(
+                    span,
+                    getattr(self, "_last_usage", {}),
+                    query=query,
+                    answer=getattr(self, "_stream_answer", ""),
+                )
                 span.__exit__(None, None, None)
             self._last_usage = {}
+            self._stream_answer = ""
 
     def chat(self, query: str, *, conversation_id: str = "", inputs: Mapping[str, Any] | None = None) -> ChatResult:
         result = ChatResult(conversation_id=conversation_id)

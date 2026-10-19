@@ -102,9 +102,10 @@ def test_stream_chat_without_usage_keeps_cost_explicitly_unpriced():
     list(client.stream_chat("pergunta"))
     trace.finish()
     summary = trace.summary()
-    assert summary["input_tokens"] == 0
-    assert summary["output_tokens"] == 0
+    assert summary["input_tokens"] > 0
+    assert summary["output_tokens"] > 0
     assert summary["cost"] == 0.0
+    assert trace.spans[0].metadata["usage_source"] == "local_estimate"
 
 
 

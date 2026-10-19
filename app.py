@@ -29,10 +29,12 @@ from src.answer_router import (
 from src.dify_client import DifyClient, DifyClientError
 
 
-def stream_production_rag(query: str, conversation_id: str = ""):
-    """Yield production Dify Chatflow events without a backend wrapper."""
+def stream_production_rag(
+    query: str, conversation_id: str = "", trace: TraceContext | None = None
+):
+    """Yield production Dify Chatflow events with usage-aware tracing."""
 
-    client = DifyClient.from_environment()
+    client = DifyClient.from_environment(trace=trace)
     yield from client.stream_chat(query, conversation_id=conversation_id)
 
 
@@ -1270,7 +1272,7 @@ if question or uploaded_files:
                 dify_id = st.session_state.conversation_id
                 with trace.span("rag.dify", "dify", task_name="stream_chat"):
                     event_stream = stream_production_rag(
-                        question, conversation_id=dify_id
+                        question, conversation_id=dify_id, trace=trace
                     )
                 for event in event_stream:
                     if event.get("event") == "message":
