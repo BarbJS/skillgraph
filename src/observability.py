@@ -199,10 +199,13 @@ class ObservabilityStore:
     def _send_langfuse(self, trace):
         """Send only aggregate, sanitized trace and span telemetry."""
         try:
-            root = self._langfuse.start_as_current_observation(
+            root = self._langfuse.start_span(
                 name=trace.route,
-                as_type="span",
-                metadata={"role": trace.role, "user_id": trace.user_id, "status": trace.status},
+                metadata={
+                    "role": trace.role,
+                    "user_id": trace.user_id,
+                    "status": trace.status,
+                },
                 input={"route": trace.route},
             )
             root.update(
@@ -219,9 +222,8 @@ class ObservabilityStore:
             for span in trace.spans:
                 if span.name == "trace":
                     continue
-                child = self._langfuse.start_as_current_observation(
+                child = root.start_span(
                     name=span.name,
-                    as_type="span",
                     metadata={
                         "service": span.service,
                         "task_name": span.task_name,
