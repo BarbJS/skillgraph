@@ -563,21 +563,6 @@ def _render_sidebar(
         st.write(
             "Assistente de competências e aprendizagem corporativa. Os dados da NexaTech são sintéticos."
         )
-        if technical:
-            st.caption("Backend técnico: Dify + Weaviate gerenciado")
-            if db_error:
-                st.warning(f"DuckDB indisponível: {db_error}")
-            else:
-                st.success("DuckDB: camada de dados disponível")
-            if (
-                st.button(
-                    "Testar indicador de lacunas",
-                    use_container_width=True,
-                    key="developer-test-gaps",
-                )
-                and database
-            ):
-                st.dataframe(database.competency_gaps(), hide_index=True)
         st.divider()
         st.subheader("Conversas")
         if st.button(
