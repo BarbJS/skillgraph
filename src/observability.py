@@ -226,16 +226,30 @@ class ObservabilityStore:
                 },
                 input={"route": trace.route},
             )
+            input_tokens = sum(s.input_tokens for s in trace.spans)
+            output_tokens = sum(s.output_tokens for s in trace.spans)
+            cost = round(sum(s.cost for s in trace.spans), 8)
+            cost_source = (
+                "provider_reported"
+                if cost
+                else "local_or_unpriced"
+            )
             root.update(
                 output={
                     "status": trace.status,
                     "trace_id": trace.trace_id,
                     "duration_ms": round((time.perf_counter() - trace.started) * 1000, 2),
-                    "input_tokens": sum(s.input_tokens for s in trace.spans),
-                    "output_tokens": sum(s.output_tokens for s in trace.spans),
-                    "cost": round(sum(s.cost for s in trace.spans), 8),
-                    "cost_source": "local_or_unpriced",
-                }
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cost": cost,
+                    "cost_source": cost_source,
+                },
+                usage_details={
+                    "input": input_tokens,
+                    "output": output_tokens,
+                    "total": input_tokens + output_tokens,
+                },
+                cost_details={"total_cost": cost} if cost else None,
             )
             for span in trace.spans:
                 if span.name == "trace":

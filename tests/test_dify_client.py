@@ -59,6 +59,55 @@ def test_stream_chat_parses_dify_events_without_logging_key():
     assert session.payload["json"]["response_mode"] == "streaming"
 
 
+def test_stream_chat_records_provider_usage_on_trace():
+    events = [
+        "event: message",
+        'data: {"answer":"resposta"}',
+        "",
+        "event: message_end",
+        'data: {"usage":{"prompt_tokens":12,"completion_tokens":7,"total_tokens":19,"cost":0.03}}',
+        "",
+    ]
+    session = FakeSession(FakeResponse(events))
+    from src.observability import TraceContext
+
+    trace = TraceContext("rag", role="desenvolvedor", user_key="synthetic")
+    client = DifyClient(
+        "http://localhost", "secret-key", "user", session=session, trace=trace
+    )
+    list(client.stream_chat("pergunta"))
+    trace.finish()
+    summary = trace.summary()
+    assert summary["input_tokens"] == 12
+    assert summary["output_tokens"] == 7
+    assert summary["cost"] == 0.03
+
+
+def test_stream_chat_without_usage_keeps_cost_explicitly_unpriced():
+    events = [
+        "event: message",
+        'data: {"answer":"resposta"}',
+        "",
+        "event: message_end",
+        'data: {"message_id":"m1"}',
+        "",
+    ]
+    session = FakeSession(FakeResponse(events))
+    from src.observability import TraceContext
+
+    trace = TraceContext("rag", role="desenvolvedor", user_key="synthetic")
+    client = DifyClient(
+        "http://localhost", "secret-key", "user", session=session, trace=trace
+    )
+    list(client.stream_chat("pergunta"))
+    trace.finish()
+    summary = trace.summary()
+    assert summary["input_tokens"] == 0
+    assert summary["output_tokens"] == 0
+    assert summary["cost"] == 0.0
+
+
+
 def test_empty_question_is_rejected():
     client = DifyClient("http://localhost", "secret-key", "user")
     with pytest.raises(DifyClientError, match="não pode ser vazia"):
