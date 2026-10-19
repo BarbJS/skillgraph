@@ -133,6 +133,21 @@ def run_agent_turn(
                 default=str,
             )
 
+        def competency_gap_tool() -> str:
+            """Query aggregate competency gaps from read-only DuckDB."""
+            if database is None:
+                raise RuntimeError("DuckDB não foi habilitado para esta rota.")
+            return json.dumps(
+                _trace_tool(
+                    "tool.competency_gap",
+                    "duckdb",
+                    "CompetencyGapTool",
+                    lambda: database.competency_gap_breakdown(limit=10),
+                ),
+                ensure_ascii=False,
+                default=str,
+            )
+
         def policy_tool(question: str) -> str:
             """Retrieve policy evidence through the published Dify Chatflow."""
             if dify is None:
@@ -152,6 +167,7 @@ def run_agent_turn(
         tools = {
             "CompetencyRecommendationTool": prediction_tool,
             "TrainingCatalogTool": training_tool,
+            "CompetencyGapTool": competency_gap_tool,
             "DifyPolicyTool": policy_tool,
         }
         jev_result = {}
@@ -200,11 +216,8 @@ def run_agent_turn(
         core_output = tasks_output[0] if tasks_output else None
         reasoning_steps = agent_execution_steps(
             route.value,
-            completed_task_count=len(tasks_output),
             core_decision=core_output,
         )
-        if not reasoning_steps:
-            reasoning_steps = agent_execution_steps(route.value)
         reasoning_steps = sanitize_steps(reasoning_steps)
         return {
             "status": "completed",

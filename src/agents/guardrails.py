@@ -50,6 +50,7 @@ def tool_allowed(agent: str, tool_name: str) -> bool:
         "Prediction Specialist": {"CompetencyRecommendationTool"},
         "Gap Analyst": set(),
         "Learning Path & Training Recommendation Agent": {"TrainingCatalogTool"},
+        "Structured Data Specialist": {"CompetencyGapTool"},
         "Policy Specialist": {"DifyPolicyTool"},
         "Safety Reviewer": set(),
         "Response Synthesizer": set(),

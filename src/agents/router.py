@@ -44,7 +44,7 @@ def route_turn(message: str, *, has_resume: bool = False) -> AgentRoute:
         term in normalized
         for term in ("lacuna", "gap", "prioridade de desenvolvimento")
     ):
-        return AgentRoute.GAP
+        return AgentRoute.STRUCTURED
     if any(
         term in normalized
         for term in ("política", "politica", "reembolso", "elegibilidade")

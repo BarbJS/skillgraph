@@ -100,9 +100,9 @@ _ROUTE_SPECIALISTS: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]]
     "structured_data": (
         (
             "Structured Data Specialist",
-            "training",
+            "structured_data",
             "Consultar somente dados estruturados autorizados.",
-            ("TrainingCatalogTool",),
+            ("CompetencyGapTool",),
         ),
     ),
 }

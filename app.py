@@ -1134,7 +1134,11 @@ if question or uploaded_files:
     agent_route = route_turn(question)
     use_agent_runtime = (
         os.getenv("CREWAI_ENABLED", "false").casefold() == "true"
-        and agent_route.value in {"training_recommendation", "policy_rag"}
+        and agent_route.value in {
+            "training_recommendation",
+            "policy_rag",
+            "structured_data",
+        }
         and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
     )
     trace.route = agent_route.value if use_agent_runtime else route.intent.value

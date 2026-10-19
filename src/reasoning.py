@@ -95,7 +95,7 @@ _AGENT_STEP_SPECS: dict[str, tuple[str, str | None]] = {
     ),
     "Structured Data Specialist": (
         "Consultou o indicador autorizado em dados estruturados.",
-        "TrainingCatalogTool",
+        "CompetencyGapTool",
     ),
     "Safety Reviewer": (
         "Validou schema, escopo, PII, evidência e necessidade de revisão humana.",
@@ -195,6 +195,13 @@ def route_steps(route: str) -> list[dict[str, Any]]:
             step("Roteamento legado", "Classificou a solicitação como indicador; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
             step("DuckDB", "Consultou funções read-only e retornou dados agregados.", tool="DuckDB read-only"),
             step("Resposta final", "Organizou o indicador para apresentação.", tool="Streamlit"),
+        ]
+    if route == "structured_data":
+        return [
+            step("Core Router", "Selecionou a consulta estruturada de lacunas.", tool="Core Router"),
+            step("Structured Data Specialist", "Consultou as lacunas agregadas no DuckDB read-only.", tool="CompetencyGapTool"),
+            step("Safety Reviewer", "Verificou que o resultado é agregado e não expõe identificadores.", tool="Safety Reviewer"),
+            step("Response Synthesizer", "Organizou o indicador final para o usuário.", tool="Response Synthesizer"),
         ]
     if route == "training_recommendation":
         return [
