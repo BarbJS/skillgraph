@@ -60,8 +60,26 @@ Após salvar a imagem, inclua no relatório:
 O arquivo `evals/golden_dataset.jsonl` contém **25 casos** de RAG, SQL, segurança, PII, injection, ML, lacunas, treinamentos, política, multi-turno e fora de escopo. `evals/agent_goldens.jsonl` acrescenta quatro cenários compostos de agentes. O script `scripts/evaluate-ai.py` valida schema, rota e bloqueio sem consumir tokens. Os casos semânticos ficam em `evals/rag_goldens.jsonl`, com resposta, contexto e ground truth.
 
 O runner `scripts/evaluate-ai-live.py` usa DeepEval como LLM-as-a-judge e calcula Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall. O adapter usa o modelo local configurado no endpoint OpenAI-compatible. O arquivo semântico agora contém **doze casos RAG**, todos com resposta, contexto e ground truth, permitindo avaliar pelo menos dez perguntas no runner live. Os resultados efetivos ficam em `output/evaluation/live_ai_report.json` após a execução.
-O relatório é exibido em “Qualidade e Evals”. A execução realizada avaliou 12 casos e todos passaram o limiar configurado. As médias foram: Faithfulness **0,9514**, Answer Relevancy **0,9236**, Contextual Precision **1,0000** e Contextual Recall **0,8810**; a taxa geral de aprovação foi **100%**. As menores pontuações foram Faithfulness 0,6667 e Answer Relevancy 0,5000 no caso `rag-gold-007`, Contextual Recall 0,5000 nos casos `rag-gold-003` e `rag-gold-004`, e Contextual Recall 0,5714 no caso `rag-gold-010`. Esses pontos são weaknesses para revisão, não evidência de perfeição. Resultados são evidência complementar, não garantia absoluta.
+O relatório é exibido em “Qualidade e Evals”. A execução realizada avaliou 12 casos e todos passaram o limiar configurado de 0,50. As médias foram: Faithfulness **0,9514**, Answer Relevancy **0,9236**, Contextual Precision **1,0000** e Contextual Recall **0,8810**; a taxa geral de aprovação foi **100%**. As menores pontuações foram Faithfulness 0,6667 e Answer Relevancy 0,5000 no caso `rag-gold-007`, Contextual Recall 0,5000 nos casos `rag-gold-003` e `rag-gold-004`, e Contextual Recall 0,5714 no caso `rag-gold-010`. Esses pontos são weaknesses para revisão, não evidência de perfeição. Resultados são evidência complementar, não garantia absoluta.
 
+Scores por caso registrados no relatório live:
+
+| Caso | Faithfulness | Relevancy | Precision | Recall | Média |
+|---|---:|---:|---:|---:|---:|
+| `rag-gold-001` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-002` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-003` | 1,0000 | 1,0000 | 1,0000 | 0,5000 | 0,8750 |
+| `rag-gold-004` | 1,0000 | 1,0000 | 1,0000 | 0,5000 | 0,8750 |
+| `rag-gold-005` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-006` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-007` | 0,6667 | 0,5000 | 1,0000 | 1,0000 | 0,7917 |
+| `rag-gold-008` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-009` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-010` | 1,0000 | 0,8333 | 1,0000 | 0,5714 | 0,8512 |
+| `rag-gold-011` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
+| `rag-gold-012` | 0,7500 | 0,7500 | 1,0000 | 1,0000 | 0,8750 |
+
+O judge registrado foi `meta-llama-3-8b-instruct`, com 12 casos avaliados e 12 aprovados.
 O relatório detalhado está em `output/evaluation/live_ai_report.json` e registra o judge `meta-llama-3-8b-instruct`, o dataset, cada caso, cada métrica, razões do judge e recomendações.
 
 DeepEval significa **DeepEval**; “Deep Evil” não é o nome da ferramenta.
