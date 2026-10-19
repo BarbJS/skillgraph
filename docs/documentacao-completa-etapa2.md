@@ -42,6 +42,19 @@ A rota ML é deliberadamente separada:
 
 A Etapa 1 permanece responsável por RAG, DuckDB, Dify, Weaviate, Streamlit, segurança e observabilidade conversacional. A Etapa 2 usa o LM Studio local diretamente para interpretação e explicação, mantendo o Dify inalterado.
 
+### 2.1 Mapa das quatro frentes desenvolvidas
+
+A Etapa 2 foi organizada em quatro frentes integradas. Cada frente resolve um problema diferente e amplia a capacidade da aplicação sem substituir os fluxos confiáveis da Etapa 1:
+
+| Frente | Para que serve | Como foi desenvolvida | Integração com o projeto | Impacto para o usuário final |
+|---|---|---|---|---|
+| **Machine Learning** | Recomendar trilhas e priorizar competências a partir de um perfil não identificador | O*NET 31.0, transformação controlada de ocupações, FLAML, comparação de modelos, artefato PKL, validação e XAI | A aba Machine Learning usa o LM Studio para interpretar a pergunta e o backend para validar o perfil e executar o PKL; não mistura ML com RAG ou DuckDB | Recebe uma recomendação exploratória de desenvolvimento com ranking, prioridades, competências reconhecidas e incerteza |
+| **Sistema multiagente** | Encaminhar cada solicitação ao especialista e à ferramenta adequados | CrewAI, Core Router, crews por rota, contratos Pydantic, ferramentas allowlisted, Reviewer e Synthesizer | O chat principal chama o runtime CrewAI quando habilitado; as rotas de treinamentos e políticas usam DuckDB ou Dify, e o fallback legado permanece disponível | Recebe respostas mais especializadas, rastreáveis e com menor privilégio por agente |
+| **Observabilidade e Langfuse** | Tornar execuções, latência, erros, consumo e etapas técnicas auditáveis | `TraceContext`, `SpanContext`, logs sanitizados, métricas agregadas, painel do Desenvolvedor e envio opcional ao Langfuse | Os traces são criados nas rotas de RAG, DuckDB, CrewAI, OCR e JEV; a aba ML possui métricas e explicabilidade próprias e não cria trace automático no caminho atual; a integração externa é opt-in | Permite investigar falhas e desempenho sem expor PII, currículo bruto, prompts privados ou chain-of-thought |
+| **Golden Dataset e DeepEval** | Verificar contratos, roteamento, bloqueios e qualidade semântica das respostas | Golden Dataset versionado, testes offline, runner live e quatro métricas DeepEval como LLM-as-a-judge | Os casos e relatórios aparecem na área Qualidade e Evals; a execução live é explícita e separada do caminho normal da aplicação | Dá evidência de qualidade e regressão, ajudando a evitar respostas sem fonte ou mudanças que quebrem o comportamento esperado |
+
+Nas seções seguintes, cada frente é descrita em termos de objetivo, desenvolvimento, integração, impacto e limitações. Essa separação também permite explicar a contribuição da Etapa 2 para o projeto e para cada perfil de usuário sem confundir recomendação, execução técnica, observabilidade e avaliação.
+
 ## 3. Fonte de dados e licença
 
 A base de treinamento é exclusivamente o **O*NET 31.0 Database**, mantido pelo U.S. Department of Labor:
@@ -203,6 +216,12 @@ O LLM não pode:
 
 A explicação final recebe apenas o resultado estruturado calculado pelo backend.
 
+### 8.1 Integração e impacto do Machine Learning
+
+A integração preserva a separação de responsabilidades da Etapa 1: o Streamlit apresenta a interface, o LM Studio interpreta e explica, e o backend controla validação, artefato, cálculo e limites. O PKL não é treinado durante uma pergunta, não consulta o corpus RAG nem as tabelas do DuckDB e não recebe identificadores pessoais.
+
+Para o projeto, isso adiciona uma capacidade preditiva auditável sem transformar o LLM em executor de código ou decisor de RH. Para o analista ou gestor, o impacto é uma recomendação de trilha acompanhada de prioridades, competências reconhecidas, desconhecidas e incerteza. Para o usuário desenvolvedor, a aba técnica expõe métricas, cobertura e XAI quando disponível. Para todos os perfis, a recomendação permanece exploratória e exige validação humana.
+
 ## 9. Segurança, privacidade e limites
 
 - Nunca enviar nome completo, CPF, e-mail, telefone ou endereço do colaborador.
@@ -234,33 +253,45 @@ O Microsoft Responsible AI Toolbox fica como evolução futura para análise de 
 
 ## 12. Sistema multiagente com CrewAI e JEV
 
-A Etapa 2 também prepara uma camada multiagente para operar sobre a fundação da Etapa 1 e o modelo de competências. O CrewAI é o orquestrador local; ele não fornece um modelo de linguagem próprio. Os agentes usam o LM Studio por uma API compatível com OpenAI.
+**Objetivo e impacto.** Esta frente transforma a conversa em rotas especializadas: em vez de um agente genérico com acesso a tudo, o sistema seleciona o especialista e a ferramenta mínima para cada intenção. Para o projeto, isso conecta as capacidades novas à fundação da Etapa 1; para o usuário, produz respostas mais delimitadas, rastreáveis e compatíveis com evidências.
+
+**Desenvolvimento e implementação.** O CrewAI foi usado como orquestrador local sobre o LM Studio, com factory de crews por rota, prompts versionados, contratos Pydantic, limites de iteração, retry e timeout, `allow_delegation=False`, guardrails de entrada e revisão final. O Core Router classifica cada turno; o especialista executa somente a tarefa da rota; o Safety Reviewer verifica schema, PII, escopo e evidência; e o Response Synthesizer redige a resposta final. O pensamento privado do modelo não faz parte do contrato público: a interface expõe somente etapas estruturadas e sanitizadas.
+
+**Integração.** O runtime é chamado pelo chat principal quando `CREWAI_ENABLED=true`. As perguntas de treinamentos usam a rota `training_recommendation` e `TrainingCatalogTool` sobre DuckDB read-only; perguntas de política usam `policy_rag` e `DifyPolicyTool` sobre o Chatflow existente. A rota `resume_analysis` combina extração PDF/OCR, perfil, JEV e agentes. Se o CrewAI estiver desativado ou indisponível, o chat preserva o fallback legado de RAG/SQL, permitindo executar a aplicação sem a dependência opcional.
+
+**Impacto para os usuários.** O analista ou gestor recebe uma resposta de treinamento ou política produzida por um especialista delimitado, com fontes ou registros autorizados. O perfil Desenvolvedor consegue visualizar a rota, a ferramenta e os spans sem acessar conteúdo privado. A revisão humana continua obrigatória.
+
+### 12.1 Componentes e fluxo de dados
+
+A implementação está distribuída entre `src/agents/router.py` (seleção), `src/agents/crew.py` (factory), `src/agents/runtime.py` (execução), `src/agents/schemas.py` (contratos), `src/agents/guardrails.py` (permissões) e `src/agents/tools.py` (fronteiras). O fluxo de uma pergunta normal é:
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│ Streamlit — chat principal                                          │
-│ mensagem + PDF opcional                                             │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│ Core Router — decide a rota a cada turno                            │
-│ lê mensagem atual + estado estruturado da conversa                  │
-└───────┬───────────────┬───────────────┬───────────────┬─────────────┘
-        │               │               │               │
-        ▼               ▼               ▼               ▼
-   Currículo       Predição ML      Lacunas       Treinamentos
-        │               │               │               │
-        ▼               ▼               ▼               ▼
-       JEV             PKL/XAI       estado       DuckDB read-only
-        │               │               │               │
-        └───────────────┴───────────────┴───────────────┘
-                               ▼
-                    Core Router + estado atualizado
-                               ▼
-                    Reviewer → Synthesizer → usuário
+mensagem
+  → guardrail de entrada
+  → Core Router
+  → especialista da rota
+  → ferramenta allowlisted, quando necessária
+  → Safety Reviewer
+  → Response Synthesizer
+  → resposta + state_patch + trace sanitizado
+```
 
-Rota de políticas:
-Core Router → Policy Agent → Dify Chatflow → Weaviate → LM Studio
+Esse desenho evita misturar o cálculo ML, as consultas DuckDB e o RAG documental na mesma ferramenta e mantém a compatibilidade com a Etapa 1.
+
+### 12.2 Currículo, OCR e JEV
+
+O fluxo de currículo também é uma aplicação prática do sistema multiagente. O PDF é validado e limitado a 10 MB; o PyMuPDF extrai texto e, quando não há texto extraível, o OCR local é acionado. O currículo temporário não é persistido. O texto é redigido antes da chamada opcional ao JEV, e o resultado estruturado é convertido em `EmployeeProfile` validado. Para o usuário, isso transforma um PDF em competências, níveis, confiança, evidências, itens não reconhecidos e informações ausentes, sem apresentar o currículo bruto como resposta final.
+
+A integração JEV permanece opcional (`JEV_ENABLED=false` por padrão). Quando desativada ou sem credencial, o sistema informa que a extração estruturada não foi concluída, sem fingir que houve uma chamada externa.
+
+A relação entre a interface existente e as ferramentas da Etapa 2 é:
+
+```text
+Streamlit → Core Router/CrewAI → especialista da rota
+                                ├── TrainingCatalogTool → DuckDB read-only
+                                ├── DifyPolicyTool → Dify/Weaviate
+                                ├── CompetencyRecommendationTool → PKL/XAI
+                                └── Resume/OCR → JEV opcional
 ```
 
 ### O Core Router e o estado da conversa
@@ -283,7 +314,7 @@ Rotas principais:
 | `resume_analysis` | Resume Interpreter + Profile | extractor local e JEV |
 | `ml_prediction` | Prediction Specialist | PKL/XAI de competências |
 | `gap_analysis` | Gap Analyst | estado estruturado |
-| `learning_recommendation` | Learning Path & Training Recommendation | funções read-only do DuckDB |
+| `training_recommendation` | Learning Path & Training Recommendation | funções read-only do DuckDB |
 | `policy_rag` | Policy Specialist | Chatflow Dify existente |
 | `structured_data` | Structured Data Specialist | funções DuckDB existentes |
 | `smalltalk` | Core/local | nenhuma chamada externa |
@@ -304,8 +335,7 @@ Cada agente pode executar mais de uma tarefa dentro do próprio escopo. A crew n
 
 ### ReAct controlado
 
-Os agentes especialistas podem planejar uma ação antes de executar uma ferramenta, mas com limites explícitos:
-
+Quando `CREWAI_AGENT_REASONING=true` e a versão do CrewAI/modelo oferece suporte, os agentes especialistas podem planejar uma ação antes de executar uma ferramenta, mas com limites explícitos. O padrão do projeto mantém esse modo desativado para favorecer compatibilidade com modelos locais:
 ```text
 Reason/Plan interno breve
   ↓
@@ -351,7 +381,7 @@ PDF temporário
   ↓
 PyMuPDF: extração de texto
   ↓
-OCR futuro para PDF escaneado
+OCR local para PDFs escaneados quando a extração de texto não retorna conteúdo
   ↓
 state JSON higienizado
   ↓
@@ -407,9 +437,17 @@ Docker continua executando Dify, Weaviate, Postgres, Redis e proxies. A aplicaç
 
 ## 13. Observabilidade, Langfuse e telemetria
 
-A Etapa 2 ampliou a observabilidade criada na Etapa 1 para acompanhar não apenas as rotas RAG e DuckDB, mas também o ciclo de execução multiagente, o processamento de currículos, as chamadas ao JEV, a inferência ML e as etapas de explicabilidade.
+**Objetivo e impacto.** Observabilidade transforma uma execução que antes seria apenas uma resposta em um registro técnico auditável. Para o projeto, ela permite medir a camada conversacional, multiagente, OCR, JEV, Dify e DuckDB usando um mesmo modelo de trace. O painel de explicabilidade da aba ML apresenta métricas do modelo separadamente; a página ML não cria um `TraceContext` próprio no caminho atual. Para o usuário técnico, isso permite investigar latência, falhas, consumo e rota sem expor conteúdo sensível.
+
+**Desenvolvimento e implementação.** `TraceContext` representa uma execução e `SpanContext` representa uma etapa. O sistema registra rota, status, duração, serviço, tarefa/agente, tokens, custo quando disponível e erro. Os dados são sanitizados antes de serem gravados em `logs/observability.jsonl` ou enviados ao Langfuse. O painel do Desenvolvedor foi implementado como uma área própria do Streamlit para consulta de métricas e detalhes de spans.
+
+**Integração.** O tracing acompanha o caminho legado da Etapa 1 e as rotas novas da Etapa 2: RAG/Dify, DuckDB, CrewAI, extração PDF/OCR e JEV. O Langfuse é opt-in por `LANGFUSE_ENABLED=true`; quando a flag está desligada ou o SDK/credencial não está disponível, o painel local continua funcionando. O ML possui métricas e explicabilidade próprias na aba técnica; sua integração com o tracing deve ser entendida como parte do contexto operacional, não como geração automática de trace em toda consulta ML. O envio externo contém somente agregados e identificadores sanitizados, não o prompt ou a resposta completa.
+
+**Impacto para o usuário final.** A observabilidade não altera a resposta funcional diretamente, mas aumenta a confiabilidade percebida e a capacidade de suporte: uma falha pode ser associada a uma rota e a um Trace ID, enquanto o perfil Desenvolvedor consegue verificar onde a execução demorou ou falhou. Isso também permite comparar mudanças de modelo, prompt ou corpus com evidências operacionais.
 
 ### 13.1 Tracing local
+
+A Etapa 2 ampliou a observabilidade criada na Etapa 1 para acompanhar não apenas as rotas RAG e DuckDB, mas também o ciclo de execução multiagente, o processamento de currículos, as chamadas ao JEV, a inferência ML e as etapas de explicabilidade.
 
 O módulo `src/observability.py` implementa `TraceContext` e `SpanContext`. Cada execução pode registrar, de forma sanitizada:
 
@@ -463,9 +501,19 @@ O painel técnico do perfil Desenvolvedor está em `src/observability_ui.py`. El
 
 ## 14. Golden Dataset, DeepEval e avaliação da qualidade
 
-A Etapa 2 separa três níveis de avaliação: testes determinísticos, golden dataset e julgamento semântico com DeepEval.
+**Objetivo e impacto.** Esta frente verifica se as rotas, os bloqueios e as respostas continuam coerentes depois das mudanças da Etapa 2. O Golden Dataset funciona como contrato reproduzível; o DeepEval acrescenta uma avaliação semântica orientada por evidência. Para o projeto, isso reduz regressões; para o usuário final, aumenta a probabilidade de receber respostas relevantes, fundamentadas e dentro do escopo.
+
+**Desenvolvimento e implementação.** `evals/golden_dataset.jsonl` reúne casos sintéticos de RAG, SQL, segurança, ML, lacunas, treinamentos, políticas, multi-turno e fora de escopo. `scripts/evaluate-ai.py` valida schema, rota e bloqueio sem consumir tokens. Os casos RAG em `evals/rag_goldens.jsonl` possuem resposta, contexto e ground truth. O runner live usa `FaithfulnessMetric`, `AnswerRelevancyMetric`, `ContextualPrecisionMetric` e `ContextualRecallMetric`; `src/deepeval_report.py` converte o retorno do DeepEval em resultados estruturados com médias, medianas, mínimos, máximos, pass rate, weaknesses e recomendações.
+
+**Integração.** A área `Qualidade e Evals` do perfil Desenvolvedor carrega o Golden Dataset e exibe relatórios offline e live. A avaliação live é explicitamente separada do caminho normal do Streamlit porque pode consumir tokens do LM Studio. O adapter `src/deepeval_judge.py` utiliza o endpoint OpenAI-compatible do modelo local configurado; o mesmo relatório pode ser associado ao modelo, dataset e configuração utilizados.
+
+**Impacto para o usuário final.** O usuário não precisa conhecer o runner ou as métricas para utilizar o chat, mas se beneficia de uma aplicação que testa bloqueios de PII/injection, roteamento e aderência ao contexto. O perfil técnico consegue identificar uma weakness de relevancy, faithfulness, precision ou recall e orientar ajustes de prompt, chunking, Top K, fontes ou roteamento.
+
+O Golden Dataset da Etapa 2 inclui casos de ML e agentes como contrato documental, enquanto a validação live do DeepEval está concentrada nos casos que possuem resposta, contexto e ground truth, atualmente os casos RAG de `evals/rag_goldens.jsonl`. Isso evita afirmar que todas as rotas multiagente ou a inferência ML já são avaliadas semanticamente pelo runner live.
 
 ### 14.1 Golden Dataset
+
+A Etapa 2 separa três níveis de avaliação: testes determinísticos, Golden Dataset e julgamento semântico com DeepEval.
 
 O arquivo `evals/golden_dataset.jsonl` contém 25 casos sintéticos do domínio, cobrindo:
 
@@ -507,6 +555,21 @@ Além do golden geral, `evals/rag_goldens.jsonl` contém casos com resposta, con
 
 O módulo `src/evaluation_ai.py` integra o DeepEval como LLM-as-a-judge. O runner live é explícito e não é acionado pelo `pytest` nem pelo caminho normal do Streamlit, porque pode consumir tokens do LM Studio.
 
+A implementação usa o modelo configurado no adapter `src/deepeval_judge.py` por meio do endpoint OpenAI-compatible do LM Studio. O mesmo provedor local pode atuar como modelo de interpretação/explicação e como juiz, mas os papéis permanecem separados: o DeepEval avalia uma resposta e não executa a lógica de negócio do SkillGraph. O relatório registra o caso avaliado, as métricas disponíveis, a média e a taxa de aprovação; quando o retorno do judge não pode ser interpretado, registra erro de parsing em vez de inventar scores.
+
+Para o usuário final, o impacto é indireto: respostas apoiadas em contexto e rotas estáveis reduzem respostas fora do escopo. Para o desenvolvedor, cada weakness orienta uma melhoria em corpus, chunking, Top K, prompt, ferramenta ou roteamento.
+
+Exemplo de execução live:
+
+```bash
+python scripts/evaluate-ai-live.py --deepeval --yes-live \\
+  --dataset evals/rag_goldens.jsonl --deepeval-case rag-gold-003
+```
+
+O relatório é consumido pela área `Qualidade e Evals` e salvo em `output/evaluation/live_ai_report.json`, que permanece fora do controle de versão.
+
+O nome correto da ferramenta é **DeepEval**; “Deep Evil” não é o nome do componente.
+
 As métricas avaliadas são:
 
 - **Faithfulness:** verifica se a resposta está apoiada no contexto recuperado;
@@ -514,7 +577,7 @@ As métricas avaliadas são:
 - **Contextual Precision:** verifica se os contextos relevantes estão bem priorizados;
 - **Contextual Recall:** verifica se o contexto contém evidência suficiente para o ground truth.
 
-O adapter `src/deepeval_judge.py` usa o endpoint OpenAI-compatible do LM Studio. O comando live exige confirmação explícita:
+O comando live exige confirmação explícita:
 
 ```bash
 make evaluate-ai-live
@@ -523,6 +586,8 @@ make evaluate-ai-live
 O runner utiliza `--yes-live` e seleciona apenas os casos que possuem resposta, contexto e ground truth. O relatório gerado fica em `output/evaluation/live_ai_report.json`, diretório ignorado pelo Git.
 
 A avaliação executada localmente dos casos RAG demonstrou respostas com alta faithfulness e relevancy para as perguntas testadas. Ainda assim, o judge é uma evidência complementar, não uma verdade absoluta: resultados dependem do modelo avaliador, do prompt e do contexto fornecido.
+
+O relatório pode ser consultado na área `Qualidade e Evals` do perfil Desenvolvedor.
 
 ### 14.3 Interpretação e melhorias
 
@@ -662,14 +727,3 @@ Essas limitações não são ocultadas. Elas orientam os próximos experimentos:
 - manter revisão humana e governança antes de qualquer uso organizacional.
 
 Este documento descreve a Etapa 2 como continuação da fundação conversacional da Etapa 1. A Etapa 3 permanece fora do escopo desta entrega.
-
-## 19. Próximos passos
-
-- aumentar e diversificar o catálogo de ocupações e competências;
-- adicionar fontes licenciadas específicas de IA generativa;
-- avaliar o modelo com especialistas de RH e tecnologia;
-- melhorar o mapeamento de aliases e sinônimos;
-- realizar divisão por grupos ocupacionais relacionados;
-- criar explicações de lacunas mais fiéis às competências observadas;
-- adicionar versionamento formal dos datasets e modelos;
-- manter revisão humana e governança antes de qualquer uso organizacional.

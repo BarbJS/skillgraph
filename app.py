@@ -474,15 +474,12 @@ def _render_grouped_manager_chart(
     if frame.empty or not value_columns:
         return
     colors = ["#16A34A", "#DC2626", "#2563EB", "#F59E0B"]
-    maximum = max(
-        float(
-            pd.to_numeric(frame[value_columns], errors="coerce")
-            .fillna(0)
-            .to_numpy()
-            .max()
-        ),
-        1.0,
+    numeric_values = (
+        frame[value_columns]
+        .apply(pd.to_numeric, errors="coerce")
+        .fillna(0)
     )
+    maximum = max(float(numeric_values.to_numpy().max()), 1.0)
     legend = " ".join(
         f"<span style='margin-right:12px'><i style='background:{colors[i]};display:inline-block;width:10px;height:10px;border-radius:50%'></i> {html.escape(column)}</span>"
         for i, column in enumerate(value_columns)
