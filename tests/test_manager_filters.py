@@ -39,3 +39,4 @@ def test_training_filters_limit_summary_and_kpis():
     assert all(row["modalidade"] == "Online" for row in rows)
     assert kpis["registros"] >= 0
     assert 0 <= kpis["taxa_aprovacao"] <= 100
+    assert kpis["custo_catalogo_associado"] >= 0

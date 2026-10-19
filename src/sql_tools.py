@@ -289,7 +289,7 @@ class SkillGraphDatabase:
         )
         params = (status,) if status is not None else ()
         row = self.connection.execute(
-            """SELECT COUNT(*), COALESCE(AVG(CASE WHEN lower(CAST(ft.aprovado AS VARCHAR)) IN ('true','1') THEN 1.0 ELSE 0.0 END),0), COALESCE(AVG(CAST(ft.nota AS DOUBLE)),0), COALESCE(SUM(CAST(t.duracao_horas AS INTEGER)),0), COUNT(*) FILTER (WHERE lower(CAST(ft.aprovado AS VARCHAR)) NOT IN ('true','1'))
+            """SELECT COUNT(*), COALESCE(AVG(CASE WHEN lower(CAST(ft.aprovado AS VARCHAR)) IN ('true','1') THEN 1.0 ELSE 0.0 END),0), COALESCE(AVG(CAST(ft.nota AS DOUBLE)),0), COALESCE(SUM(CAST(t.duracao_horas AS INTEGER)),0), COUNT(*) FILTER (WHERE lower(CAST(ft.aprovado AS VARCHAR)) NOT IN ('true','1')), COALESCE(SUM(CAST(t.custo AS DOUBLE)),0)
             FROM funcionario_treinamento ft LEFT JOIN treinamentos t ON t.treinamento_id = ft.treinamento_id
             WHERE (? IS NULL OR t.modalidade = ?) AND (? IS NULL OR t.categoria = ?)"""
             + approved_clause,
@@ -301,6 +301,7 @@ class SkillGraphDatabase:
             "nota_media": round(float(row[2] or 0), 1),
             "horas_associadas": int(row[3] or 0),
             "reprovacoes": int(row[4] or 0),
+            "custo_catalogo_associado": round(float(row[5] or 0), 2),
         }
 
     def training_summary(self, *, limit: int = 20) -> list[dict[str, Any]]:
