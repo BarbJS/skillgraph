@@ -161,8 +161,33 @@ class SpanContext:
 
 class ObservabilityStore:
     def __init__(self):
-        self.traces = []
+        self.traces = self._load_local_traces()
         self.alert_manager = AlertManager()
+
+    @staticmethod
+    def _load_local_traces() -> list[dict[str, Any]]:
+        """Restore recent local traces so Streamlit reruns do not erase history."""
+        if not LOG_PATH.exists():
+            return []
+        traces: list[dict[str, Any]] = []
+        try:
+            for line in LOG_PATH.read_text(encoding="utf-8").splitlines()[-500:]:
+                if not line.strip():
+                    continue
+                value = json.loads(line)
+                if isinstance(value, dict) and value.get("trace_id"):
+                    traces.append(value)
+        except (OSError, json.JSONDecodeError):
+            return []
+        return traces[-500:]
+
+    def refresh(self) -> None:
+        """Reload local trace history after a Streamlit rerun."""
+        known = {str(item.get("trace_id")) for item in self.traces}
+        for summary in self._load_local_traces():
+            if str(summary.get("trace_id")) not in known:
+                self.traces.append(summary)
+        self.traces = self.traces[-500:]
         self._langfuse = None
         self._langfuse_error = None
         if _enabled():

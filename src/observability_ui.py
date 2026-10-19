@@ -19,8 +19,10 @@ def render_observability() -> None:
     elif langfuse_status["initialized"]:
         st.success("Langfuse inicializado para envio de traces sanitizados.")
     if st.button("Atualizar traces", key="refresh-observability"):
+        OBSERVABILITY.refresh()
         st.rerun()
 
+    OBSERVABILITY.refresh()
     snapshot = OBSERVABILITY.snapshot()
     cols = st.columns(4)
     cols[0].metric("Traces", snapshot["traces"])
