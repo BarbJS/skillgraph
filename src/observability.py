@@ -227,6 +227,7 @@ class ObservabilityStore:
         self._check_alerts(summary)
         if self._langfuse:
             self._send_langfuse(trace)
+        return summary
 
     def _check_alerts(self, s):
         if s.get("status") == "error":
@@ -259,11 +260,6 @@ class ObservabilityStore:
             input_tokens = sum(s.input_tokens for s in trace.spans)
             output_tokens = sum(s.output_tokens for s in trace.spans)
             cost = round(sum(s.cost for s in trace.spans), 8)
-            cost_source = (
-                "provider_reported"
-                if cost
-                else "local_or_unpriced"
-            )
             root.update(
                 output={
                     "status": trace.status,
@@ -272,7 +268,7 @@ class ObservabilityStore:
                     "input_tokens": input_tokens,
                     "output_tokens": output_tokens,
                     "cost": cost,
-                    "cost_source": cost_source,
+                    "cost_source": "provider_reported" if cost else "local_or_unpriced",
                 },
                 usage_details={
                     "input": input_tokens,
@@ -299,7 +295,6 @@ class ObservabilityStore:
                         "input_tokens": int(span.input_tokens),
                         "output_tokens": int(span.output_tokens),
                         "cost": round(float(span.cost), 8),
-                        "cost_source": "local_or_unpriced",
                         "status": span.status,
                     }
                 )
@@ -343,19 +338,8 @@ class ObservabilityStore:
                     "name": value,
                     "count": len(spans),
                     "error_rate": round(errors / len(spans), 4) if spans else 0.0,
-                    "latency_avg_ms": (
-                        round(sum(durations) / len(durations), 2) if durations else 0.0
-                    ),
-                    "latency_p95_ms": (
-                        round(
-                            statistics.quantiles(durations, n=20, method="inclusive")[
-                                18
-                            ],
-                            2,
-                        )
-                        if len(durations) > 1
-                        else (round(durations[0], 2) if durations else 0.0)
-                    ),
+                    "latency_avg_ms": round(sum(durations) / len(durations), 2) if durations else 0.0,
+                    "latency_p95_ms": round(statistics.quantiles(durations, n=20, method="inclusive")[18], 2) if len(durations) > 1 else (round(durations[0], 2) if durations else 0.0),
                     "input_tokens": sum(x.get("input_tokens", 0) for x in spans),
                     "output_tokens": sum(x.get("output_tokens", 0) for x in spans),
                     "cost": round(sum(x.get("cost", 0) for x in spans), 8),
@@ -365,9 +349,8 @@ class ObservabilityStore:
 
     def recent_trace_rows(self, limit: int = 10) -> list[dict[str, Any]]:
         """Return the newest sanitized trace summaries for the developer dashboard."""
-        rows = []
-        for trace in reversed(self.traces[-max(1, limit):]):
-            rows.append({
+        return [
+            {
                 "Trace ID": trace.get("trace_id", ""),
                 "Timestamp": trace.get("timestamp", ""),
                 "Rota": trace.get("route", ""),
@@ -377,11 +360,11 @@ class ObservabilityStore:
                 "Tokens entrada": trace.get("input_tokens", 0),
                 "Tokens saída": trace.get("output_tokens", 0),
                 "Custo": trace.get("cost", 0.0),
-            })
-        return rows
+            }
+            for trace in reversed(self.traces[-max(1, limit):])
+        ]
 
     def get_trace(self, trace_id: str) -> dict[str, Any] | None:
-        """Find one sanitized trace by its support-friendly identifier."""
         for trace in self.traces:
             if trace.get("trace_id") == trace_id:
                 return trace
@@ -394,43 +377,22 @@ class ObservabilityStore:
         return self._group_metrics("task_name")
 
     def recent_errors(self) -> list[dict[str, Any]]:
-        return [
-            trace
-            for trace in self.traces
-            if trace.get("status") in {"error", "timeout"}
-        ][-50:]
+        return [trace for trace in self.traces if trace.get("status") in {"error", "timeout"}][-50:]
 
     def snapshot(self):
         ts = self.traces
         vals = [float(t.get("duration_ms", 0)) for t in ts]
 
         def pct(q):
-            return (
-                round(
-                    statistics.quantiles(vals, n=100, method="inclusive")[
-                        max(0, int(q * 100) - 1)
-                    ],
-                    2,
-                )
-                if len(vals) > 1
-                else (round(vals[0], 2) if vals else 0.0)
-            )
+            return round(statistics.quantiles(vals, n=100, method="inclusive")[max(0, int(q * 100) - 1)], 2) if len(vals) > 1 else (round(vals[0], 2) if vals else 0.0)
 
         return {
             "traces": len(ts),
             "latency_p50_ms": pct(0.5),
             "latency_p95_ms": pct(0.95),
             "latency_p99_ms": pct(0.99),
-            "error_rate": (
-                round(sum(t.get("status") == "error" for t in ts) / len(ts), 4)
-                if ts
-                else 0.0
-            ),
-            "timeout_rate": (
-                round(sum(t.get("status") == "timeout" for t in ts) / len(ts), 4)
-                if ts
-                else 0.0
-            ),
+            "error_rate": round(sum(t.get("status") == "error" for t in ts) / len(ts), 4) if ts else 0.0,
+            "timeout_rate": round(sum(t.get("status") == "timeout" for t in ts) / len(ts), 4) if ts else 0.0,
             "input_tokens": sum(t.get("input_tokens", 0) for t in ts),
             "output_tokens": sum(t.get("output_tokens", 0) for t in ts),
             "cost": round(sum(t.get("cost", 0) for t in ts), 8),
