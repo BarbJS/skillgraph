@@ -206,12 +206,6 @@ def run_agent_turn(
                 "conversation_state": json.dumps(state, ensure_ascii=False),
             }
         )
-        if route == AgentRoute.RESUME:
-            jev = None
-
-        if route == AgentRoute.RESUME:
-            jev = None
-
         tasks_output = getattr(result, "tasks_output", None) or []
         core_output = tasks_output[0] if tasks_output else None
         reasoning_steps = agent_execution_steps(
