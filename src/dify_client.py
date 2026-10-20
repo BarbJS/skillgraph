@@ -29,7 +29,12 @@ class ChatResult:
 
 
 def _usage_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
-    candidates = [event.get("usage"), event.get("metadata"), event.get("data")]
+    candidates = [
+        event.get("usage"),
+        event.get("metadata"),
+        event.get("data"),
+        event.get("message_end"),
+    ]
     for candidate in candidates:
         if isinstance(candidate, dict):
             nested = candidate.get("usage")
@@ -60,19 +65,30 @@ def _usage_from_event(event: Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _number(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _usage_value(usage: Mapping[str, Any], *keys: str) -> int:
     for key in keys:
-        value = usage.get(key)
-        if isinstance(value, (int, float)):
+        value = _number(usage.get(key))
+        if value is not None:
             return int(value)
     return 0
 
 
 def _cost_value(usage: Mapping[str, Any]) -> float:
-    for key in ("cost", "total_cost", "total_cost_usd", "total_cost_usd"):
-        value = usage.get(key)
-        if isinstance(value, (int, float)):
-            return float(value)
+    for key in ("cost", "total_cost", "total_cost_usd", "total_price"):
+        value = _number(usage.get(key))
+        if value is not None:
+            return value
     return 0.0
 
 
