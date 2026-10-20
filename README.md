@@ -15,7 +15,7 @@ O sistema ajuda a:
 - identificar lacunas agregadas de competências;
 - recomendar trilhas técnicas para um colaborador descrito sem PII;
 - sugerir treinamentos e pré-requisitos;
-- analisar currículos sintéticos em PDF;
+- analisar currículos em PDF com foco em extrair competências e senioridade;
 - explicar as evidências e limitações das recomendações;
 - acompanhar rotas, agentes, ferramentas, latência e erros;
 - avaliar o comportamento do sistema com Golden Dataset e DeepEval.
