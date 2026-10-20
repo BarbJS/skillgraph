@@ -128,16 +128,20 @@ def _set_span_usage(span: Any, usage: Mapping[str, Any], *, query: str = "", ans
         "completion_tokens",
         "completion_token_count",
     )
-    usage_available = bool(input_tokens or output_tokens or usage.get("total_tokens"))
+    total_tokens = _usage_value(usage, "total_tokens", "total_token_count")
+    usage_available = input_tokens > 0 or output_tokens > 0 or total_tokens > 0
     if not usage_available:
         input_tokens = _estimate_tokens(query)
         output_tokens = _estimate_tokens(answer)
+        usage_source = "local_estimate"
+    else:
+        usage_source = "provider_reported"
     cost = _cost_value(usage)
     span.set_usage(input_tokens=input_tokens, output_tokens=output_tokens, cost=cost)
     span.metadata.update(
         {
             "usage_available": usage_available,
-            "usage_source": "provider_reported" if usage_available else "local_estimate",
+            "usage_source": usage_source,
             "cost_source": "provider_reported" if cost else "local_or_unpriced",
         }
     )

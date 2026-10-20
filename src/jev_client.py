@@ -135,7 +135,7 @@ class JevClient:
                 output_tokens=int(usage.get("output_tokens", 0)),
                 cost=0.0,
             )
-            span.record.metadata.update(
+            span.metadata.update(
                 {
                     "confidence_mean": mean,
                     "confidence_min": minimum,
