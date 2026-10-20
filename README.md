@@ -22,6 +22,10 @@ O sistema ajuda a:
 
 Os dados da NexaTech são sintéticos. O SkillGraph é um protótipo acadêmico e **não substitui avaliação humana, autenticação corporativa, decisões de RH ou políticas reais de privacidade**.
 
+### Interface do SkillGraph via Streamlit
+
+![Interface do SkillGraph via Streamlit](docs/assets/interface.png)
+
 ## 🧩 Desenvolvimento faseado: um único sistema integrado
 
 A Etapa 1 construiu a fundação conversacional e de segurança:
@@ -33,6 +37,8 @@ A Etapa 1 construiu a fundação conversacional e de segurança:
 - Fontes recuperadas, tabelas, indicadores e gráficos;
 - Guardrails contra PII, prompt injection e SQL destrutivo.
 
+Para conhecer em detalhes o desenvolvimento da Etapa 1, consulte a [documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md).
+
 A Etapa 2 amplia essa fundação sem substituí-la:
 
 - Machine Learning tradicional com O*NET 31.0, FLAML e artefato PKL;
@@ -42,6 +48,9 @@ A Etapa 2 amplia essa fundação sem substituí-la:
 - Análise de currículo com PyMuPDF, OCR local e JEV opcional;
 - Observabilidade local e integração opcional com Langfuse;
 - Golden Dataset, testes automatizados e DeepEval como LLM-as-a-judge.
+
+O [relatório técnico da Etapa 2](docs/evaluation-etapa2.md) apresenta o dataset, as métricas, os agentes, a observabilidade e os resultados da avaliação.
+Para saber como a Etapa 2 foi desenvolvida e integrada tecnicamente, consulte a [documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md).
 
 Em conjunto, o SkillGraph encaminha cada solicitação para a camada mais adequada: documentos, dados estruturados, Machine Learning ou uma rota multiagente. As duas etapas formam um único produto integrado.
 
