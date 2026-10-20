@@ -62,7 +62,7 @@ Roteador de intenção
   └── Solicitação sensível → bloqueio antes de modelo ou banco
 ```
 
-Quando `CREWAI_ENABLED=true`, perguntas de treinamentos, políticas e lacunas podem usar as rotas multiagente. Se o CrewAI estiver desativado ou indisponível, os fluxos legados RAG/SQL continuam disponíveis.
+O CrewAI é obrigatório na aplicação integrada. Perguntas de treinamentos, políticas e lacunas usam as rotas multiagente; se o CrewAI ou suas dependências estiverem indisponíveis, a aplicação interrompe esse fluxo com um diagnóstico explícito, em vez de simular uma execução multiagente por RAG/SQL.
 
 ## 🏗️ Arquitetura e responsabilidades
 

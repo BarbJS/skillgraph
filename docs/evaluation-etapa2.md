@@ -49,11 +49,13 @@ Com `LANGFUSE_ENABLED=true` e credenciais apenas no `.env`, o `ObservabilityStor
 
 A saída deve informar `generated: 5` e `langfuse_enabled: true`. No projeto autenticado do Langfuse, filtre pela última hora e confirme as cinco rotas antes de capturar a tela.
 
-Após salvar a imagem, inclua no relatório:
+A imagem abaixo é a evidência visual da integração. Ela mostra cinco traces reais gerados pela interface do SkillGraph em rotas diferentes. Cada trace permite comparar rota, status, duração e spans sem expor conteúdo privado.
 
-```markdown
-![Cinco traces sanitizados no Langfuse](assets/langfuse-five-traces.png)
-```
+![Cinco traces reais do SkillGraph no Langfuse](assets/langfuse-five-traces.png)
+
+Para reproduzir a captura, configure as chaves no `.env`, reinicie o Streamlit, execute cinco perguntas pela interface e filtre o dashboard Langfuse por `Past 1 hour`. O painel externo fica no `LANGFUSE_BASE_URL`; o painel local da aplicação permanece em **Perfil desenvolvedor → Observabilidade**.
+
+A imagem versionada em `docs/assets/langfuse-five-traces.png` é a evidência entregue com este relatório.
 
 ## 5. Golden Dataset e DeepEval
 

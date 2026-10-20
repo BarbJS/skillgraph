@@ -76,11 +76,11 @@ def run_agent_turn(
             "answer": "Descreva um colaborador, uma competência, uma trilha, um treinamento ou uma política que deseja consultar.",
             "state_patch": {},
         }
-    if os.getenv("CREWAI_ENABLED", "false").casefold() != "true":
+    if os.getenv("CREWAI_ENABLED", "true").casefold() != "true":
         return {
-            "status": "disabled",
+            "status": "error",
             "route": route.value,
-            "answer": "O fluxo multiagente está preparado, mas desativado neste ambiente.",
+            "answer": "O CrewAI é obrigatório para este fluxo. Configure CREWAI_ENABLED=true e reinicie a aplicação.",
             "state_patch": {"last_route": route.value},
         }
     try:
