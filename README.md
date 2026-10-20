@@ -1,172 +1,132 @@
 # 🧠 SkillGraph
 
-> Projeto em desenvolvimento na disciplina **AI Factory: Building Intelligent Systems**, do curso de graduação em Inteligência Artificial da **PUCPR (2026)**.
+> Projeto acadêmico em desenvolvimento na disciplina **AI Factory: Building Intelligent Systems**, do curso de Inteligência Artificial da **PUCPR (2026)**.
 >
 > Orientação: **Professor Wellington Rodrigo Monteiro**
 > Desenvolvimento: **Bárbara Jaeger Specian**, com assistência de Inteligência Artificial.
 
-## 🎯 Objetivo central
+## 🎯 O que é o SkillGraph?
 
-O objetivo do SkillGraph é transformar a gestão de competências e a aprendizagem corporativa em um processo orientado por dados, evidências e inteligência artificial. A aplicação foi criada para ajudar organizações a identificar lacunas de habilidades, consultar requisitos de cargos, priorizar treinamentos e orientar o desenvolvimento profissional de forma mais personalizada, transparente e auditável.
+O **SkillGraph** é um assistente de competências e aprendizagem corporativa para a NexaTech, uma empresa fictícia de tecnologia e serviços. O projeto combina documentos, dados estruturados, modelos locais de linguagem, Machine Learning e agentes especializados para apoiar conversas de desenvolvimento profissional em Recursos Humanos.
 
-## 🧩 Declaração CBL em resumo
+O sistema ajuda a:
 
-> As respostas completas do CBL e a documentação técnica estão em [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md).
+- consultar políticas, cargos, trilhas e treinamentos;
+- identificar lacunas agregadas de competências;
+- recomendar trilhas técnicas para um colaborador descrito sem PII;
+- sugerir treinamentos e pré-requisitos;
+- analisar currículos sintéticos em PDF;
+- explicar as evidências e limitações das recomendações;
+- acompanhar rotas, agentes, ferramentas, latência e erros;
+- avaliar o comportamento do sistema com Golden Dataset e DeepEval.
 
-- **Grande ideia:** usar dados, evidências e IA para apoiar a gestão de competências e a aprendizagem corporativa.
-- **Pergunta essencial:** como uma organização pode identificar lacunas de competências e recomendar trilhas de aprendizagem personalizadas na era da IA generativa?
-- **Desafio:** construir uma aplicação funcional que combine RAG, dados estruturados, interface conversacional, segurança e observabilidade.
-- **Justificativa:** escolha própria de explorar Recursos Humanos e aprendizagem corporativa como um novo domínio para aplicação de conhecimentos de RAG, LLM local, banco de dados e linguagem natural.
+Os dados da NexaTech são sintéticos. O SkillGraph é um protótipo acadêmico e **não substitui avaliação humana, autenticação corporativa, decisões de RH ou políticas reais de privacidade**.
 
+## 🧩 Etapa 1 + Etapa 2: um único sistema integrado
 
-> **Assistente de competências e aprendizagem corporativa** para a NexaTech — uma empresa fictícia de tecnologia e serviços.
+A Etapa 1 construiu a fundação conversacional e de segurança:
 
-O **SkillGraph** transforma documentos, dados estruturados e modelos de linguagem locais em uma experiência conversacional para consultar políticas de treinamento, entender requisitos de cargos, identificar lacunas de competências e explorar possibilidades de desenvolvimento profissional.
+- interface Streamlit com histórico, perfis simulados e feedback;
+- roteador determinístico de intenções;
+- RAG com Chatflow Dify e armazenamento vetorial Weaviate;
+- consultas read-only em DuckDB sobre CSVs relacionais;
+- fontes recuperadas, tabelas, indicadores e gráficos;
+- guardrails contra PII, prompt injection e SQL destrutivo.
 
-## 🔄 Como o SkillGraph funciona
+A Etapa 2 amplia essa fundação sem substituí-la:
 
-1. **A pessoa usuária faz uma pergunta** pela interface Streamlit.
-2. **Os guardrails verificam a solicitação**, bloqueando dados sensíveis, prompt injection e operações inseguras.
-3. **O roteador identifica a intenção** e escolhe o fluxo adequado.
-4. **Perguntas documentais seguem para o RAG:** o Dify recupera trechos no Weaviate e chama o LM Studio para gerar uma resposta baseada nas fontes.
-5. **Perguntas estruturadas seguem para o DuckDB:** funções determinísticas consultam os CSVs e retornam tabelas ou indicadores.
-6. **O Streamlit apresenta o resultado**, com streaming, fontes, tabelas, gráficos, feedback e métricas.
+- Machine Learning tradicional com O*NET 31.0, FLAML e artefato PKL;
+- recomendação de trilhas, prioridades, incerteza e explicabilidade;
+- sistema multiagente com CrewAI e LM Studio;
+- agentes especializados com ferramentas allowlisted;
+- análise de currículo com PyMuPDF, OCR local e JEV opcional;
+- observabilidade local e integração opcional com Langfuse;
+- Golden Dataset, testes automatizados e DeepEval como LLM-as-a-judge.
 
-### Exemplo de pergunta documental
+Em conjunto, o SkillGraph encaminha cada solicitação para a camada mais adequada: documentos, dados estruturados, Machine Learning ou uma rota multiagente. As duas etapas formam um único produto integrado.
 
-```text
-Pergunta: Quantas horas de treinamento um funcionário sênior deve realizar por ano?
-```
-
-O sistema valida a pergunta, identifica uma intenção documental, envia a solicitação ao Chatflow do Dify, recupera os trechos relevantes da política de treinamentos no Weaviate, encaminha o contexto ao LM Studio e retorna a resposta em streaming com a fonte utilizada.
-
-> ⚠️ **Aviso importante:** os dados da NexaTech são sintéticos. O protótipo não substitui decisões de RH, avaliação humana, autenticação corporativa ou políticas reais de privacidade.
-
-## 🧭 Comece por aqui
-
-| Se você quer... | Comece por... |
-| --- | --- |
-| Entender a Etapa 1 | 📖 [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md) |
-| Entender a Etapa 2 | 📖 [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md) |
-| Ler o relatório técnico da Etapa 2 | 📄 [Relatório técnico — Etapa 2](docs/evaluation-etapa2.md) |
-| Executar o projeto localmente | 🚀 [Como executar em uma máquina nova](#-como-executar-em-uma-máquina-nova) |
-| Configurar Dify e LM Studio | 🧩 [Configuração do LM Studio no Dify](docs/model-setup.md) |
-| Entender o RAG | 📚 [Pipeline Dify + Weaviate](#-arquitetura-em-uma-visão) |
-
-### 🗺️ Navegação rápida
-
-- [✨ O que o projeto demonstra](#-o-que-este-projeto-demonstra)
-- [🎯 Problema de negócio](#-problema-de-negócio)
-- [🏗️ Arquitetura](#arquitetura-em-uma-visão)
-- [🚀 Execução local](#como-executar-em-uma-máquina-nova)
-- [💡 Exemplos](#exemplos-para-experimentar)
-- [🧪 Testes](#testes-e-avaliação)
-- [🛡️ Segurança](#segurança-privacidade-e-limites)
-- [📚 Documentação](#documentação-e-leitura-adicional)
-
-## ✨ O que este projeto demonstra
-
-- 💬 Chat em linguagem natural com respostas em português e streaming.
-- 📚 RAG sobre políticas, descrições de cargos, trilhas e FAQ de desenvolvimento.
-- 🔎 RAG com Dify e o armazenamento vetorial gerenciado pelo Weaviate.
-- 🧮 Consultas analíticas no DuckDB sobre CSVs relacionais.
-- 🛡️ Bloqueio de PII, salário individual, SQL destrutivo e tentativas de prompt injection.
-- 📊 Indicadores agregados, tabelas, gráficos, fontes recuperadas e métricas locais.
-- 🧑‍💼 Experiências simuladas para desenvolvedor, gestor e RH.
-- 🧪 Testes automatizados e golden dataset para avaliar o roteamento.
-
-## 🎯 Problema de negócio
-
-A NexaTech oferece treinamentos, trilhas e oportunidades de desenvolvimento, mas suas informações estão distribuídas entre documentos e tabelas. Isso dificulta responder perguntas como:
-
-- Quais competências são exigidas para determinado cargo?
-- Qual é a carga horária anual esperada para cada nível?
-- Quais competências apresentam mais lacunas?
-- Quais treinamentos estão disponíveis para desenvolver uma habilidade?
-- Como consultar uma situação específica sem expor dados pessoais?
-
-O SkillGraph não automatiza promoção, demissão ou qualquer decisão de carreira. Seu objetivo é organizar evidências para apoiar conversas de desenvolvimento: funcionários consultam políticas e trilhas, gestores acompanham indicadores agregados e RH consulta regras e prioridades de aprendizagem.
-
-## 🏗️ Arquitetura em uma visão
+## 🔄 Como uma pergunta percorre o sistema
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Usuário                                                      │
-└─────────────────────────────┬────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│ Streamlit: chat, histórico, feedback, tabelas e observabilidade │
-└─────────────────────────────┬────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────┐
-│ Guardrails + roteador determinístico de intenção             │
-└──────────────┬──────────────────┬──────────────────┬────────┘
-               │                  │                  │
-               ▼                  ▼                  ▼
-       Pergunta documental  Indicador/diagnóstico  Conteúdo sensível
-               │                  │                  │
-               ▼                  ▼                  ▼
-       Dify Chatflow       DuckDB determinístico   Bloqueio imediato
-               │                  │
-               ▼                  ▼
-          Weaviate       CSVs relacionais
-               │                  │
-               ▼                  ▼
-       Contexto recuperado   Resultado estruturado
-               │                  │
-               ▼                  │
-       LM Studio local            │
-       (resposta gerada)          │
-               │                  │
-               └──────┬───────────┘
-                      ▼
-        Resposta final no Streamlit
-                      │
-                      ▼
-                    Usuário
-
-Pipeline RAG principal:
-Streamlit → Dify Chatflow → Weaviate → contexto recuperado
-                              ↓
-                       LM Studio local
-                              ↓
-               resposta aumentada → Streamlit → Usuário
-
-Infraestrutura Dify:
-Docker Desktop → Dify self-hosted → API/Chatflow/serviços auxiliares
+Usuário
+  ↓
+Streamlit: chat, histórico, perfis e upload de PDF
+  ↓
+Guardrails: PII, prompt injection, escopo e operações inseguras
+  ↓
+Roteador de intenção
+  ├── RAG documental → Dify → Weaviate → LM Studio → resposta + fontes
+  ├── Dados estruturados → funções read-only → DuckDB → tabela/indicador
+  ├── Machine Learning → LM Studio interpreta → backend valida → PKL/XAI → trilhas
+  ├── CrewAI → Core Router → especialista → ferramenta → Reviewer → Synthesizer
+  └── Solicitação sensível → bloqueio antes de modelo ou banco
 ```
 
-### Responsabilidade de cada componente
+Quando `CREWAI_ENABLED=true`, perguntas de treinamentos, políticas e lacunas podem usar as rotas multiagente. Se o CrewAI estiver desativado ou indisponível, os fluxos legados RAG/SQL continuam disponíveis.
 
-| Componente | Responsabilidade no SkillGraph |
-| --- | --- |
-| 🐳 Docker Desktop | Executar o Dify e seus serviços de forma isolada e reproduzível. |
-| 🧩 Dify | Orquestrar o Chatflow, disponibilizar a API e gerenciar a recuperação do RAG. |
-| 🗂️ Weaviate | Armazenar e recuperar vetores dentro do caminho de RAG gerenciado pelo Dify. |
-| 🧠 LM Studio | Servir localmente o modelo de chat e o modelo de embeddings por uma API compatível com OpenAI. |
-| 🖥️ Streamlit | Entregar a interface, o histórico, os perfis simulados e a integração das camadas. |
-| 🦆 DuckDB | Consultar os CSVs relacionais com rapidez, sem transformar dados tabulares em texto. |
+## 🏗️ Arquitetura e responsabilidades
 
-O Dify orquestra o Chatflow: recebe a pergunta do Streamlit, consulta o Weaviate, combina o contexto recuperado com a pergunta e chama o modelo de chat do LM Studio. O modelo gera a resposta aumentada, que retorna pelo Dify à API do SkillGraph e é apresentada pelo Streamlit ao usuário. Para perguntas estruturadas, o roteador consulta diretamente o DuckDB e devolve o resultado ao Streamlit sem passar pelo RAG.
+| Camada | Responsabilidade |
+|---|---|
+| Streamlit | Interface, histórico, perfis simulados, upload, respostas, tabelas, gráficos e painéis técnicos. |
+| Guardrails | Bloqueio de PII, prompt injection, decisões laborais e operações SQL inseguras. |
+| Roteador | Seleção determinística da intenção e da rota apropriada. |
+| Dify + Weaviate | RAG documental, recuperação de contexto, Chatflow e fontes. |
+| DuckDB | Consultas agregadas e read-only nos CSVs relacionais sintéticos. |
+| LM Studio | Modelo local de chat, interpretação ML, síntese e suporte ao CrewAI. |
+| ML/FLAML/PKL | Recomendação de trilhas e prioridades de competências. |
+| CrewAI | Orquestração de agentes por rota e handoffs estruturados. |
+| JEV | Integração opcional para sinais estruturados de currículo sanitizado. |
+| Langfuse | Tracing externo sanitizado e distribuído, quando habilitado. |
+| Golden/DeepEval | Regressão determinística e avaliação semântica de respostas. |
 
-O Weaviate armazena e recupera os vetores usados internamente pelo Dify. Essa decisão evita duplicidade entre bases vetoriais e simplifica a operação e a evolução do sistema.
+### Sistema multiagente
+
+O CrewAI não fornece o LLM; ele orquestra o modelo local do LM Studio. Os agentes são selecionados por rota e não formam uma cadeia fixa para todas as perguntas:
+
+| Agente | Papel | Ferramenta |
+|---|---|---|
+| Core Router | Classificar intenção e escolher rota | Nenhuma |
+| Resume Interpreter | Interpretar currículo sanitizado | OCR/PyMuPDF + JEV via backend |
+| Profile Normalizer | Normalizar competências e remover PII | Nenhuma |
+| Prediction Specialist | Executar recomendação de trilhas | `CompetencyRecommendationTool` / PKL |
+| Gap Analyst | Interpretar lacunas | Estado estruturado |
+| Learning Path & Training Recommendation Agent | Consultar treinamentos e pré-requisitos | `TrainingCatalogTool` / DuckDB |
+| Policy Specialist | Consultar políticas com fontes | `DifyPolicyTool` / Dify |
+| Structured Data Specialist | Consultar lacunas e indicadores agregados | `CompetencyGapTool` / DuckDB |
+| Safety Reviewer | Validar segurança, schema e evidências | Nenhuma |
+| Response Synthesizer | Redigir a resposta final | Nenhuma |
+
+O painel **Raciocínio estruturado do agente** mostra somente resumos públicos dos agentes realmente usados, suas funções e ferramentas. Não exibe chain-of-thought ou prompts privados.
+
+### Machine Learning
+
+O algoritmo usa o **O*NET 31.0 Database**, fonte do U.S. Department of Labor licenciada sob **CC BY 4.0**. O processamento do projeto resultou em 24 ocupações tecnológicas, 35 features e seis trilhas. A variável-alvo `track` é uma adaptação do projeto, não um rótulo oficial do O*NET.
+
+O fluxo é:
+
+```text
+Descrição não identificadora
+  → LM Studio estrutura competências e níveis em JSON
+  → backend valida schema, níveis de 0 a 5 e PII
+  → PKL calcula até três trilhas e prioridades
+  → LM Studio explica somente o resultado calculado
+```
+
+O modelo final foi LightGBM via FLAML. Na validação, obteve Macro F1 0,7778, balanced accuracy 0,8333 e Top-2 Accuracy 1,0. O teste teve Macro F1 0,10, reforçando que a saída é exploratória e exige revisão humana. A área técnica exibe cobertura, incerteza, métricas e XAI quando disponível.
 
 ## 🚀 Como executar em uma máquina nova
 
 ### Pré-requisitos
 
-Instale ou tenha disponível:
-
 - Docker Desktop com Docker Compose v2;
-- Python 3.11.x (versão oficial suportada pelo projeto);
-- Git, `curl` e, opcionalmente, `jq`;
-- LM Studio com um modelo de chat carregado;
-- um modelo de embeddings compatível com o endpoint `/v1/embeddings`;
-- memória e espaço suficientes para o modelo local e os containers do Dify.
+- Python 3.11.x;
+- Git e `curl`;
+- LM Studio com modelo de chat carregado;
+- modelo de embeddings compatível com `/v1/embeddings`;
+- memória e espaço para o modelo local e os containers Dify.
 
-Confira as ferramentas principais:
+Verifique as ferramentas:
 
 ```bash
 docker --version
@@ -175,38 +135,39 @@ git --version
 python3 --version
 ```
 
-### 1. Preparar a configuração local
-
-Na raiz do projeto, crie o arquivo de ambiente a partir do exemplo:
+### 1. Configuração local
 
 ```bash
 cp env.example .env
 ```
 
-Revise os IDs dos modelos depois de iniciar o servidor local do LM Studio. O arquivo `.env` é ignorado pelo Git e não deve conter informações que você pretenda publicar.
+O `.env` é ignorado pelo Git e nunca deve ser publicado. Para ativar a Etapa 2 multiagente:
 
-### 2. Iniciar o servidor local do LM Studio
+```env
+CREWAI_ENABLED=true
+```
 
-No LM Studio, carregue um modelo de chat e inicie o servidor local na porta `1234`, que é a porta esperada pelo projeto por padrão. Em seguida, confira os IDs realmente expostos:
+Para habilitar o tracing externo, use as três variáveis fornecidas pelo Langfuse e a flag da aplicação:
+
+```env
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=...
+LANGFUSE_SECRET_KEY=...
+LANGFUSE_BASE_URL=https://...
+```
+
+### 2. LM Studio
+
+Inicie o servidor local na porta `1234` e confirme os IDs expostos:
 
 ```bash
 make check
-```
-
-O nome cadastrado no Dify deve ser o `id` retornado pela API, e não necessariamente o nome amigável exibido na interface do LM Studio. O projeto usa dois tipos de modelo com responsabilidades diferentes:
-
-- modelo de chat: gera a resposta final;
-- modelo de embeddings: transforma documentos e perguntas em vetores numéricos para a busca semântica.
-
-Teste os dois endpoints diretamente:
-
-```bash
 make test
 ```
 
-### 3. Preparar e iniciar o Dify
+O modelo de chat e o modelo de embeddings são responsabilidades diferentes. O primeiro gera respostas; o segundo transforma documentos e perguntas em vetores.
 
-O bootstrap baixa a versão pinada do Dify em `.dify/`, sem versionar essa instalação no projeto:
+### 3. Dify
 
 ```bash
 make bootstrap
@@ -214,220 +175,171 @@ make up
 make smoke
 ```
 
-Acesse `http://localhost/install` para concluir a criação do administrador local. Depois, configure no Dify o provider de LM Studio, cadastre o modelo de chat e o modelo de embeddings e crie/publice o Chatflow utilizado pela aplicação. O passo a passo está em [docs/model-setup.md](docs/model-setup.md).
+Acesse `http://localhost/install`, configure o provider LM Studio, cadastre chat e embeddings e publique o Chatflow. Consulte [docs/model-setup.md](docs/model-setup.md).
 
-No host, o LM Studio normalmente responde em `http://127.0.0.1:1234/v1`. Dentro dos containers Docker Desktop, o mesmo host é acessado por `http://host.docker.internal:1234/v1`. O script de bootstrap cria o ajuste de gateway necessário para o `plugin_daemon` do Dify.
-
-### 4. Instalar as dependências Python
+### 4. Dependências e Machine Learning
 
 ```bash
 make bootstrap-crewai
-
-# O comando acima prepara o ambiente oficial .venv com Python 3.11.
+make bootstrap-flaml
+make train-ml
 ```
 
-No Windows, ative o ambiente virtual com o comando equivalente do PowerShell ou do terminal utilizado.
+O treinamento gera o artefato local `.ml_artifacts/skillgraph_competency_tracks.pkl`.
 
-### 5. Executar o Streamlit
-
-Com o Chatflow publicado e a chave local configurada em `.env`, execute:
+### 5. Executar
 
 ```bash
-make run
+CREWAI_ENABLED=true make run
 ```
 
-A aplicação normalmente ficará disponível em `http://localhost:8501`. A chave da API do Dify é utilizada pelo processo Python e não é enviada ao navegador.
+A aplicação ficará em `http://localhost:8501`.
 
+## 📚 Fluxos para experimentar
 
-
-A Etapa 2 de Machine Learning possui execução e documentação próprias em [docs/documentacao-completa-etapa2.md](docs/documentacao-completa-etapa2.md). Para preparar o artefato da Etapa 2, execute `make bootstrap-flaml` e `make train-ml` conforme o guia específico.
-
-## 📚 Pipeline RAG com Dify e Weaviate
-
-O SkillGraph utiliza o Chatflow do Dify como seu único caminho de RAG. O Dify gerencia a recuperação na base de conhecimento, utiliza o Weaviate como armazenamento vetorial nesta instalação local e chama o LM Studio para gerar a resposta. A aplicação Streamlit consome o streaming retornado pela API e apresenta as fontes recuperadas.
-
-A configuração dos documentos, embeddings, chunks e Top K é feita no próprio Dify. Para iniciar o fluxo local:
-
-```bash
-make bootstrap
-make up
-make smoke
-make run
-```
-
-Depois de criar a base de conhecimento e publicar o Chatflow, não é necessário indexar uma segunda base vetorial local. Essa decisão mantém uma única fonte de recuperação, evita resultados divergentes e simplifica a reprodução e a operação do projeto.
-
-O perfil **desenvolvedor** pode consultar as métricas do fluxo principal. Gestor e RH utilizam a aplicação pela perspectiva de negócio, sem precisar conhecer detalhes de embeddings ou armazenamento vetorial.
-
-### Fluxo documental
+### RAG legado
 
 ```text
-Pergunta → Streamlit → Dify Chatflow → Weaviate → LM Studio → resposta + fontes
+Qual é a carga horária de um cargo sênior?
 ```
 
-### Fluxo estruturado
+Fluxo: roteador legado → Dify/Weaviate → resposta com fonte.
 
-```text
-Pergunta → Streamlit → roteador → função read-only → DuckDB → tabela
-```
-
-Os dois fluxos são complementares: o RAG consulta conhecimento documental; o DuckDB calcula resultados exatos sobre os CSVs relacionais.
-
-## 💡 Exemplos para experimentar
-
-Perguntas documentais, encaminhadas ao RAG:
-
-```text
-Quantas horas de treinamento um funcionário sênior deve realizar por ano?
-Quais competências são obrigatórias para um Analista de Dados Júnior?
-Como funciona a trilha de Analista de Dados Júnior para Pleno?
-Quantos treinamentos simultâneos são recomendados?
-```
-
-Perguntas estruturadas, encaminhadas ao DuckDB por ferramentas seguras:
+### Dados estruturados e CrewAI
 
 ```text
 Quais competências têm mais lacunas?
-Quais treinamentos estão disponíveis?
 ```
 
-Consulta de caso, com IDs explícitos:
+Com CrewAI habilitado: Core Router → Structured Data Specialist → `CompetencyGapTool` → Safety Reviewer → Response Synthesizer.
+
+### Treinamentos e CrewAI
 
 ```text
-Qual é a situação da competência COMP003 para o funcionário F0001?
+Quais treinamentos devo priorizar para um colaborador com lacuna em Python?
 ```
 
-Comparação baseada em evidências documentais:
+Fluxo: Core Router → Learning Path Agent → `TrainingCatalogTool` → Reviewer → Synthesizer.
+
+### Política e CrewAI
 
 ```text
-Qual é a diferença de carga horária entre os níveis Júnior e Sênior?
+Quais regras de reembolso se aplicam a este treinamento?
 ```
 
-Exemplo de solicitação bloqueada:
+Fluxo: Core Router → Policy Specialist → `DifyPolicyTool` → Reviewer → Synthesizer.
+
+### Currículo e JEV opcional
+
+Envie um PDF sintético com:
 
 ```text
-Qual é o CPF do funcionário F0001?
+Analise este currículo para desenvolvimento profissional.
 ```
 
-## 🧭 Como uma pergunta percorre o sistema
+Fluxo: PDF → PyMuPDF/OCR → sanitização → JEV opcional → Resume Interpreter → Profile Normalizer → Reviewer → Synthesizer.
 
-Antes de chamar um modelo, o SkillGraph aplica guardrails para identificar PII, salário individual, prompt injection e operações SQL inseguras. Em seguida, o roteador determinístico classifica a intenção como pergunta documental, indicador SQL, consulta de competência, comparação, smalltalk ou bloqueio.
+### Machine Learning
 
-Perguntas documentais seguem para o backend RAG selecionado e retornam resposta com fontes quando disponíveis. Indicadores agregados utilizam ferramentas SQL allowlisted no DuckDB. Consultas de competência exigem os identificadores do funcionário e da competência. Mensagens simples, como saudações, não consomem o RAG. Solicitações sensíveis são interrompidas antes de qualquer consulta ao modelo ou ao banco.
+```text
+O colaborador da equipe de dados tem Python avançado, SQL intermediário e está começando em IA generativa. Qual trilha priorizar?
+```
+
+Use a área **Machine Learning** para visualizar trilhas, prioridades, incerteza e explicabilidade.
+
+## 📊 Observabilidade e avaliação
+
+O perfil Desenvolvedor possui as áreas:
+
+- **Machine Learning:** métricas, cobertura, incerteza e XAI;
+- **Observabilidade:** traces locais, rotas, spans, latência, tokens, custos, serviços e erros;
+- **Qualidade e Evals:** Golden Dataset e relatórios DeepEval.
+
+O painel local não é o dashboard externo do Langfuse. Quando habilitado, o SkillGraph também envia traces sanitizados ao projeto Langfuse configurado em `LANGFUSE_BASE_URL`. O envio não contém PII, currículo bruto, prompts privados ou chain-of-thought.
+
+O Golden Dataset principal possui 25 casos. `evals/rag_goldens.jsonl` possui 12 casos com resposta, contexto e ground truth para o runner live. O DeepEval mede Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall. A última execução registrada avaliou 12 casos, com médias 0,9514, 0,9236, 1,0000 e 0,8810, respectivamente, e pass rate de 100%; as weaknesses continuam documentadas no relatório técnico.
+
+Execute a avaliação offline com:
+
+```bash
+make evaluate-ai
+```
+
+Para a avaliação live, que pode consumir tokens:
+
+```bash
+.crew-venv/bin/python scripts/evaluate-ai-live.py \
+  --deepeval \
+  --yes-live \
+  --dataset evals/rag_goldens.jsonl \
+  --output output/evaluation/live_ai_report.json
+```
+
+Para validar a conexão Langfuse sem expor chaves:
+
+```bash
+.crew-venv/bin/python scripts/validate-langfuse-connection.py
+```
+
+## 🧪 Testes e qualidade de código
+
+```bash
+.venv/bin/python -m pytest -q tests
+make lint
+make ci
+```
+
+A suíte cobre roteamento, guardrails, Dify/SSE, DuckDB read-only, ML/PKL/XAI, CrewAI, JEV mockado, PDF/OCR, estado multi-turno, observabilidade, Langfuse sanitizado, dashboard, Golden Dataset e UI.
+
+## 🛡️ Segurança, privacidade e limites
+
+- `.env`, `.dify/`, bancos, logs, modelos e artefatos locais não fazem parte do pacote público;
+- chaves do Dify, JEV e Langfuse nunca devem ser commitadas;
+- perguntas com PII, prompt injection e SQL destrutivo são bloqueadas;
+- DuckDB e ferramentas de agentes são read-only/allowlisted;
+- currículo bruto é temporário e sanitizado antes do JEV;
+- logs e Langfuse recebem somente metadados agregados;
+- perfis são simulações e não há autenticação/RBAC real;
+- recomendações ML não são decisões de emprego;
+- dados da NexaTech são sintéticos;
+- tokens e custos podem não estar disponíveis em providers locais; quando ausentes, o sistema informa ou estima tokens sem inventar custo.
 
 ## 📁 Organização do repositório
 
 ```text
 .
-├── app.py                         # interface Streamlit
-├── config/                        # referências de configuração do Chatflow
+├── app.py                         # interface integrada Streamlit
+├── config/                        # referências do Chatflow e perguntas JEV
 ├── data_bd/                       # CSVs relacionais sintéticos
-├── documents_rag/                 # corpus Markdown do RAG
-├── docs/                          # documentação técnica e operacional
-├── evals/                         # dataset dourado e instruções de avaliação
-├── scripts/                       # bootstrap, smoke tests e utilitários
-├── src/                           # roteamento, RAG, SQL e segurança
+├── documents_rag/                 # corpus documental
+├── docs/                          # documentação e relatório técnico
+├── evals/                         # Golden Dataset e casos semânticos
+├── scripts/                       # bootstrap, avaliação e diagnóstico
+├── src/                           # ML, agentes, RAG, SQL, JEV e observabilidade
 ├── tests/                         # testes automatizados
 ├── env.example                    # configuração sem segredos
 ├── Makefile                       # comandos operacionais
-└── requirements.txt               # dependências Python da Etapa 1
+└── requirements.txt               # dependências Python
 ```
 
-## 🤝 Como usar e colaborar
+## 🧰 Documentação
 
-Depois de configurar o ambiente seguindo o quickstart, outras pessoas podem explorar o SkillGraph com os dados sintéticos da NexaTech, testar perguntas documentais e estruturadas, revisar as fontes retornadas e executar a suíte de testes. Para colaborar, é possível propor melhorias na documentação, adicionar perguntas ao dataset de avaliação, revisar o corpus em `documents_rag/`, aprimorar as consultas read-only do DuckDB ou sugerir melhorias de usabilidade e acessibilidade. Toda contribuição deve preservar a privacidade, manter os dados sintéticos, evitar credenciais no repositório e explicar claramente o comportamento alterado.
-
-Antes de propor mudanças no Chatflow, recomenda-se testar as perguntas do dataset dourado, conferir a fidelidade das fontes, verificar a ausência de evidência e registrar impactos de latência. Alterações de código devem ser acompanhadas por testes e manter a separação entre RAG documental e dados estruturados.
-
-## 🧠 Etapa 2 — Machine Learning de competências
-
-A documentação completa, o planejamento, o treinamento FLAML e a integração do modelo pertencem à Etapa 2. Consulte [docs/documentacao-completa-etapa2.md](docs/documentacao-completa-etapa2.md).
-
-```text
-Descrição não identificadora do colaborador
-  → LM Studio estrutura competências em JSON
-  → backend valida níveis e PII
-  → skillgraph_competency_tracks.pkl
-  → trilhas Top-3 e prioridades
-  → LM Studio explica o resultado
-```
-
-Guias técnicos: [docs/ml-traditional.md](docs/ml-traditional.md), [docs/ml-llm-integration.md](docs/ml-llm-integration.md) e [docs/evaluation-ml.md](docs/evaluation-ml.md).
-
-## 🔖 Versão e qualidade do repositório
-
-A versão corrente do milestone está em [VERSION](VERSION) e as mudanças são registradas em [CHANGELOG.md](CHANGELOG.md). O projeto usa Python 3.11 como runtime oficial.
-
-Para preparar o ambiente de desenvolvimento e ativar os hooks locais:
-
-```bash
-make install-dev
-make lint
-```
-
-A validação equivalente à CI pode ser executada localmente com:
-
-```bash
-make ci
-```
-
-A CI roda em pull requests e pushes para `main`. Releases são publicados somente quando uma tag SemVer como `v0.3.0` é criada e o conteúdo de `VERSION` corresponde à tag.
-
-## 🧪 Testes e avaliação
-
-Com o ambiente virtual ativado e as dependências instaladas:
-
-```bash
-pytest -q tests
-python -m src.evaluation
-```
-
-Os testes verificam roteamento, guardrails, consultas determinísticas no DuckDB, cliente Dify, comparação de trilhas, sessões, feedback, observabilidade e o dataset dourado. A avaliação usa cenários com respostas esperadas e confirma que perguntas sensíveis não avançam para ferramentas indevidas.
-
-Para validar a infraestrutura local:
-
-```bash
-make check          # modelos expostos pelo LM Studio
-make test           # chat e embeddings do LM Studio
-make smoke          # Dify e LM Studio
-make status         # containers do Dify
-```
-
-## 🛡️ Segurança, privacidade e limites
-
-- `.env`, `.dify/`, bancos locais, logs, modelos e artefatos gerados não fazem parte do pacote público.
-- Não publique chaves de API, credenciais do Dify ou senhas dos containers.
-- Não exponha publicamente as portas do LM Studio ou do Dify durante o desenvolvimento.
-- O DuckDB aceita apenas consultas de leitura e as ferramentas da aplicação são allowlisted.
-- Os logs registram metadados de execução, não o texto completo das perguntas e respostas.
-- Os perfis de desenvolvedor, gestor e RH são simulações; ainda não existe login ou RBAC real.
-- A base não possui uma tabela-mestre completa de funcionários com nome, cargo, gestor e departamento.
-- As faixas salariais representam cargos e não autorizam inferências sobre salário individual.
-- A área de Machine Learning usa O*NET/FLAML para apoiar recomendações de trilhas de desenvolvimento, não usa as tabelas da Etapa 1 e não deve apoiar decisões automáticas de RH.
-
-Nunca use o comando abaixo em testes normais, pois ele remove volumes e dados locais do Dify:
-
-```bash
-docker compose down -v
-```
-
-## 🧩 Limitações conhecidas e próximos passos
-
-O SkillGraph é um MVP acadêmico funcional. Antes de um uso real, seria necessário implementar autenticação corporativa, autorização por perfil, política de retenção, armazenamento protegido, observabilidade centralizada, revisão humana formal e testes de carga. Também estão planejados uma tabela organizacional mais completa, integração com ferramentas corporativas, evolução da busca híbrida e ampliação do catálogo de competências de IA generativa.
-
-## 🧰 Guias operacionais
-
-- [Configuração do LM Studio no Dify](docs/model-setup.md)
-- [Machine Learning de competências](docs/ml-traditional.md)
-- [Integração LLM → PKL de competências](docs/ml-llm-integration.md)
+- [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md)
+- [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md)
+- [Relatório técnico da Etapa 2](docs/evaluation-etapa2.md)
+- [Machine Learning tradicional](docs/ml-traditional.md)
+- [Integração LLM → PKL](docs/ml-llm-integration.md)
 - [Avaliação do modelo ML](docs/evaluation-ml.md)
-- [XAI da Etapa 2](docs/xai-ml.md)
-- [CrewAI e sistema multiagente](docs/agents-crewai.md)
-- [Fluxos de conversa multiagente](docs/agent-flows.md)
-- [Fluxos de conversa multiagente](docs/agent-flows.md)
-- [Arquitetura e decisões de RAG](docs/rag-architecture-decisions.md)
-- [System prompt contextualizado](docs/system-prompt.md)
-- [Text-to-SQL seguro](docs/text-to-sql.md)
+- [XAI](docs/xai-ml.md)
+- [CrewAI e agentes](docs/agents-crewai.md)
+- [Fluxos multiagente](docs/agent-flows.md)
+- [Configuração Dify/LM Studio](docs/model-setup.md)
 - [Observabilidade](docs/observability.md)
-- [Alertas Slack](docs/slack-alerts.md)
 - [Avaliação robusta de IA](docs/evaluation-ai.md)
+- [Arquitetura RAG](docs/rag-architecture-decisions.md)
+
+## 🔖 Versão e próximos passos
+
+A versão corrente está em [VERSION](VERSION) e as mudanças em [CHANGELOG.md](CHANGELOG.md). O projeto usa Python 3.11 como runtime oficial.
+
+O SkillGraph ainda é um MVP acadêmico. A Etapa 3 pode ampliar o dataset e o corpus, validar as recomendações com especialistas, adicionar autenticação e RBAC reais, formalizar retenção e governança e realizar testes de carga.
