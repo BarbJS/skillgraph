@@ -17,7 +17,9 @@ def render_observability() -> None:
             f"Diagnóstico: {langfuse_status['error'] or 'erro não informado'}"
         )
     elif langfuse_status["initialized"]:
-        st.success("Langfuse inicializado para envio de traces sanitizados.")
+        st.success(f"Langfuse inicializado. Envios concluídos: {langfuse_status.get('sent_count', 0)}.")
+    if langfuse_status.get("error"):
+        st.warning(f"Último diagnóstico do Langfuse: {langfuse_status['error']}")
     if st.button("Atualizar traces", key="refresh-observability"):
         OBSERVABILITY.refresh()
         st.rerun()

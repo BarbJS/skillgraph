@@ -202,6 +202,8 @@ class ObservabilityStore:
         self.alert_manager = AlertManager()
         self._langfuse = None
         self._langfuse_error = None
+        self._langfuse_send_count = 0
+        self._langfuse_last_trace_id = None
         self._initialize_langfuse()
 
     @staticmethod
@@ -255,6 +257,8 @@ class ObservabilityStore:
             "enabled": _enabled(),
             "initialized": self._langfuse is not None,
             "error": self._langfuse_error,
+            "sent_count": self._langfuse_send_count,
+            "last_trace_id": self._langfuse_last_trace_id,
         }
 
     def record(self, trace):
@@ -338,6 +342,8 @@ class ObservabilityStore:
                 child.end()
             root.end()
             self._langfuse.flush()
+            self._langfuse_send_count += 1
+            self._langfuse_last_trace_id = trace.trace_id
         except Exception as exc:
             self._langfuse_error = self._safe_langfuse_error(exc)
 
