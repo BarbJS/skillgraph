@@ -39,15 +39,11 @@ Os contratos ficam em schemas Pydantic; prompts são versionados; retries, itera
 
 `TraceContext` representa a execução e `SpanContext` cada etapa. São registrados rota, status, duração, serviço, tarefa/agente, tokens, custo disponível, erros e timeouts. A área Observabilidade do perfil Desenvolvedor exibe os dez traces mais recentes, métricas agregadas, serviços, tarefas e detalhes sanitizados. O log local fica em `logs/observability.jsonl`.
 
-Com `LANGFUSE_ENABLED=true` e credenciais apenas no `.env`, o `ObservabilityStore` envia observações agregadas ao Langfuse; sem a flag ou sem credenciais, o painel local continua funcionando. O envio não inclui PII, currículo bruto, prompts privados, respostas completas ou chain-of-thought. O script `scripts/generate-langfuse-traces.py` gera cinco execuções sintéticas de rotas diferentes para a demonstração. O print deve ser obtido no dashboard Langfuse depois desse script e salvo como `docs/assets/langfuse-five-traces.png`. Cada trace permite comparar rota, duração, status e spans sem expor conteúdo privado. A imagem autêntica precisa ser produzida durante a execução final; ela ainda não existe versionada no repositório.
+Com `LANGFUSE_ENABLED=true` e credenciais apenas no `.env`, o `ObservabilityStore` envia observações agregadas ao Langfuse; sem a flag ou sem credenciais, o painel local continua funcionando. O envio não inclui PII, currículo bruto, prompts privados, respostas completas ou chain-of-thought. Os cinco traces apresentados neste relatório são **traces reais de execução da interface do SkillGraph**, gerados por perguntas efetivamente processadas pelas rotas do sistema. Nenhum deles foi criado por fixture, script sintético ou dado artificial de observabilidade. Os dados de negócio continuam sendo sintéticos por segurança, mas as execuções, durações, status, rotas e spans são reais. A captura do dashboard Langfuse foi salva como `docs/assets/langfuse-five-traces.png`. Cada trace permite comparar rota, duração, status e spans sem expor conteúdo privado.
 
-### Execução dos cinco traces
+No projeto autenticado do Langfuse, filtre pela última hora para consultar as cinco execuções antes de capturar a tela. O painel local da aplicação permanece disponível em **Perfil desenvolvedor → Observabilidade**.
 
-```bash
-.crew-venv/bin/python scripts/generate-langfuse-traces.py
-```
-
-A saída deve informar `generated: 5` e `langfuse_enabled: true`. No projeto autenticado do Langfuse, filtre pela última hora e confirme as cinco rotas antes de capturar a tela.
+O script `scripts/generate-langfuse-traces.py` existe apenas como ferramenta técnica de diagnóstico e não foi usado para produzir a evidência visual entregue neste relatório.
 
 A imagem abaixo é a evidência visual da integração. Ela mostra cinco traces reais gerados pela interface do SkillGraph em rotas diferentes. Cada trace permite comparar rota, status, duração e spans sem expor conteúdo privado.
 
