@@ -15,32 +15,32 @@ O sistema ajuda a:
 - identificar lacunas agregadas de competências;
 - recomendar trilhas técnicas para um colaborador descrito sem PII;
 - sugerir treinamentos e pré-requisitos;
-- analisar currículos sintéticos em PDF;
+- analisar currículos em PDF com foco em extrair competências e senioridade;
 - explicar as evidências e limitações das recomendações;
 - acompanhar rotas, agentes, ferramentas, latência e erros;
 - avaliar o comportamento do sistema com Golden Dataset e DeepEval.
 
 Os dados da NexaTech são sintéticos. O SkillGraph é um protótipo acadêmico e **não substitui avaliação humana, autenticação corporativa, decisões de RH ou políticas reais de privacidade**.
 
-## 🧩 Etapa 1 + Etapa 2: um único sistema integrado
+## 🧩 Desenvolvimento faseado: um único sistema integrado
 
 A Etapa 1 construiu a fundação conversacional e de segurança:
 
-- interface Streamlit com histórico, perfis simulados e feedback;
-- roteador determinístico de intenções;
+- Interface Streamlit com histórico, perfis simulados e feedback;
+- Roteador determinístico de intenções;
 - RAG com Chatflow Dify e armazenamento vetorial Weaviate;
-- consultas read-only em DuckDB sobre CSVs relacionais;
-- fontes recuperadas, tabelas, indicadores e gráficos;
-- guardrails contra PII, prompt injection e SQL destrutivo.
+- Consultas read-only em DuckDB sobre CSVs relacionais;
+- Fontes recuperadas, tabelas, indicadores e gráficos;
+- Guardrails contra PII, prompt injection e SQL destrutivo.
 
 A Etapa 2 amplia essa fundação sem substituí-la:
 
 - Machine Learning tradicional com O*NET 31.0, FLAML e artefato PKL;
-- recomendação de trilhas, prioridades, incerteza e explicabilidade;
-- sistema multiagente com CrewAI e LM Studio;
-- agentes especializados com ferramentas allowlisted;
-- análise de currículo com PyMuPDF, OCR local e JEV opcional;
-- observabilidade local e integração opcional com Langfuse;
+- Recomendação de trilhas, prioridades, incerteza e explicabilidade;
+- Sistema multiagente com CrewAI e LM Studio;
+- Agentes especializados com ferramentas allowlisted;
+- Análise de currículo com PyMuPDF, OCR local e JEV opcional;
+- Observabilidade local e integração opcional com Langfuse;
 - Golden Dataset, testes automatizados e DeepEval como LLM-as-a-judge.
 
 Em conjunto, o SkillGraph encaminha cada solicitação para a camada mais adequada: documentos, dados estruturados, Machine Learning ou uma rota multiagente. As duas etapas formam um único produto integrado.
@@ -58,11 +58,11 @@ Roteador de intenção
   ├── RAG documental → Dify → Weaviate → LM Studio → resposta + fontes
   ├── Dados estruturados → funções read-only → DuckDB → tabela/indicador
   ├── Machine Learning → LM Studio interpreta → backend valida → PKL/XAI → trilhas
-  ├── CrewAI → Core Router → especialista → ferramenta → Reviewer → Synthesizer
+  ├── CrewAI → Core Router Agent → agente especialista → ferramenta necessária → Reviewer Agent → Synthesizer Agent
   └── Solicitação sensível → bloqueio antes de modelo ou banco
+ ↓
+Resposta ao usuário
 ```
-
-O CrewAI é obrigatório na aplicação integrada. Perguntas de treinamentos, políticas e lacunas usam as rotas multiagente; se o CrewAI ou suas dependências estiverem indisponíveis, a aplicação interrompe esse fluxo com um diagnóstico explícito, em vez de simular uma execução multiagente por RAG/SQL.
 
 ## 🏗️ Arquitetura e responsabilidades
 
@@ -77,8 +77,8 @@ O CrewAI é obrigatório na aplicação integrada. Perguntas de treinamentos, po
 | ML/FLAML/PKL | Recomendação de trilhas e prioridades de competências. |
 | CrewAI | Orquestração de agentes por rota e handoffs estruturados. |
 | JEV | Integração opcional para sinais estruturados de currículo sanitizado. |
-| Langfuse | Tracing externo sanitizado e distribuído, quando habilitado. |
-| Golden/DeepEval | Regressão determinística e avaliação semântica de respostas. |
+| Langfuse | Tracing externo sanitizado e distribuído. |
+| Golden dataset/DeepEval | Testes automatizados e avaliação semântica de respostas. |
 
 ### Sistema multiagente
 
@@ -97,23 +97,7 @@ O CrewAI não fornece o LLM; ele orquestra o modelo local do LM Studio. Os agent
 | Safety Reviewer | Validar segurança, schema e evidências | Nenhuma |
 | Response Synthesizer | Redigir a resposta final | Nenhuma |
 
-O painel **Raciocínio estruturado do agente** mostra somente resumos públicos dos agentes realmente usados, suas funções e ferramentas. Não exibe chain-of-thought ou prompts privados.
-
-### Machine Learning
-
-O algoritmo usa o **O*NET 31.0 Database**, fonte do U.S. Department of Labor licenciada sob **CC BY 4.0**. O processamento do projeto resultou em 24 ocupações tecnológicas, 35 features e seis trilhas. A variável-alvo `track` é uma adaptação do projeto, não um rótulo oficial do O*NET.
-
-O fluxo é:
-
-```text
-Descrição não identificadora
-  → LM Studio estrutura competências e níveis em JSON
-  → backend valida schema, níveis de 0 a 5 e PII
-  → PKL calcula até três trilhas e prioridades
-  → LM Studio explica somente o resultado calculado
-```
-
-O modelo final foi LightGBM via FLAML. Na validação, obteve Macro F1 0,7778, balanced accuracy 0,8333 e Top-2 Accuracy 1,0. O teste teve Macro F1 0,10, reforçando que a saída é exploratória e exige revisão humana. A área técnica exibe cobertura, incerteza, métricas e XAI quando disponível.
+O painel **Raciocínio estruturado do agente** na resposta ao usuário, mostra somente resumos públicos dos agentes realmente usados, suas funções e ferramentas. Não exibe chain-of-thought ou prompts privados.
 
 ## 🚀 Como executar em uma máquina nova
 
@@ -249,13 +233,11 @@ Use a área **Machine Learning** para visualizar trilhas, prioridades, incerteza
 
 ## 📊 Observabilidade e avaliação
 
-O perfil Desenvolvedor possui as áreas:
+O perfil Desenvolvedor possui a funcionalidade principal de chat e as funcionalidades:
 
 - **Machine Learning:** métricas, cobertura, incerteza e XAI;
 - **Observabilidade:** traces locais, rotas, spans, latência, tokens, custos, serviços e erros;
 - **Qualidade e Evals:** Golden Dataset e relatórios DeepEval.
-
-O painel local não é o dashboard externo do Langfuse. Quando habilitado, o SkillGraph também envia traces sanitizados ao projeto Langfuse configurado em `LANGFUSE_BASE_URL`. O envio não contém PII, currículo bruto, prompts privados ou chain-of-thought.
 
 O Golden Dataset principal possui 25 casos. `evals/rag_goldens.jsonl` possui 12 casos com resposta, contexto e ground truth para o runner live. O DeepEval mede Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall. A última execução registrada avaliou 12 casos, com médias 0,9514, 0,9236, 1,0000 e 0,8810, respectivamente, e pass rate de 100%; as weaknesses continuam documentadas no relatório técnico.
 
@@ -302,7 +284,7 @@ A suíte cobre roteamento, guardrails, Dify/SSE, DuckDB read-only, ML/PKL/XAI, C
 - perfis são simulações e não há autenticação/RBAC real;
 - recomendações ML não são decisões de emprego;
 - dados da NexaTech são sintéticos;
-- tokens e custos podem não estar disponíveis em providers locais; quando ausentes, o sistema informa ou estima tokens sem inventar custo.
+- tokens e custos podem não estar disponíveis em providers locais; quando ausentes, o sistema informa '0' ou estima tokens sem inventar custo.
 
 ## 📁 Organização do repositório
 
