@@ -28,6 +28,36 @@ def _enabled() -> bool:
     return os.getenv("LANGFUSE_ENABLED", "false").casefold() == "true"
 
 
+def _langfuse_options() -> dict[str, Any]:
+    """Build explicit SDK options from either Langfuse env naming convention."""
+    options: dict[str, Any] = {
+        "tracing_enabled": True,
+        "flush_at": 1,
+        "flush_interval": 0.5,
+    }
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
+    base_url = (
+        os.getenv("LANGFUSE_BASE_URL", "").strip()
+        or os.getenv("LANGFUSE_HOST", "").strip()
+    )
+    release = os.getenv("LANGFUSE_RELEASE", "skillgraph-local").strip()
+    sample_rate = os.getenv("LANGFUSE_SAMPLE_RATE", "1.0").strip()
+    if public_key:
+        options["public_key"] = public_key
+    if secret_key:
+        options["secret_key"] = secret_key
+    if base_url:
+        options["base_url"] = base_url.rstrip("/")
+    if release:
+        options["release"] = release
+    try:
+        options["sample_rate"] = float(sample_rate)
+    except ValueError:
+        options["sample_rate"] = 1.0
+    return options
+
+
 def anonymous_id(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
@@ -191,7 +221,7 @@ class ObservabilityStore:
             try:
                 from langfuse import Langfuse
 
-                self._langfuse = Langfuse()
+                self._langfuse = Langfuse(**_langfuse_options())
             except Exception as exc:
                 self._langfuse_error = self._safe_langfuse_error(exc)
 

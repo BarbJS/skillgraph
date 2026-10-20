@@ -1,4 +1,26 @@
-from src.observability import ObservabilityStore, TraceContext
+from src.observability import ObservabilityStore, TraceContext, _langfuse_options
+
+
+def test_langfuse_options_support_base_url_and_fast_flush(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "public")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "secret")
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://hipaa.example")
+    options = _langfuse_options()
+    assert options["base_url"] == "https://hipaa.example"
+    assert options["flush_at"] == 1
+    assert options["flush_interval"] == 0.5
+    assert options["tracing_enabled"] is True
+
+
+
+def test_langfuse_options_fallback_to_host(monkeypatch):
+    monkeypatch.delenv("LANGFUSE_BASE_URL", raising=False)
+    monkeypatch.setenv("LANGFUSE_HOST", "https://cloud.example")
+    assert _langfuse_options()["base_url"] == "https://cloud.example"
+
+
+# Existing sanitization tests continue below.
+
 
 
 def test_trace_summary_has_latency_tokens_and_cost():
