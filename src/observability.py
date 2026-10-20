@@ -25,7 +25,14 @@ def current_trace() -> "TraceContext | None":
 
 
 def _enabled() -> bool:
-    return os.getenv("LANGFUSE_ENABLED", "false").casefold() == "true"
+    """Enable Langfuse when explicitly enabled or fully configured."""
+    flag = os.getenv("LANGFUSE_ENABLED")
+    if flag is not None:
+        return flag.casefold() == "true"
+    public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
+    secret_key = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
+    base_url = os.getenv("LANGFUSE_BASE_URL", "").strip() or os.getenv("LANGFUSE_HOST", "").strip()
+    return bool(public_key and secret_key and base_url)
 
 
 def _langfuse_options() -> dict[str, Any]:
