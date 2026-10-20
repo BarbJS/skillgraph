@@ -3,9 +3,22 @@ from src.agents.router import AgentRoute, route_turn
 from src.agents.runtime import run_agent_turn
 
 
-def test_training_and_policy_messages_use_agent_routes():
+def test_training_policy_and_gap_messages_use_agent_routes():
     assert route_turn("Quais treinamentos devo priorizar?") is AgentRoute.TRAINING
     assert route_turn("Quais regras de reembolso se aplicam?") is AgentRoute.POLICY
+    assert route_turn("Quais competências têm mais lacunas?") is AgentRoute.STRUCTURED
+
+
+def test_runtime_structured_route_wires_gap_tool(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "true")
+    monkeypatch.setattr(
+        "src.agents.runtime.build_route_crew",
+        lambda route, tools: _FakeCrew(route, tools),
+    )
+    result = run_agent_turn("Quais competências têm mais lacunas?")
+    assert result["status"] == "completed"
+    assert result["route"] == "structured_data"
+    assert any(step.get("tool") == "CompetencyGapTool" for step in result["reasoning"])
 
 
 def test_training_and_policy_roles_are_least_privilege():
