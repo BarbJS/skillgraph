@@ -39,26 +39,18 @@ Os contratos ficam em schemas Pydantic; prompts são versionados; retries, itera
 
 `TraceContext` representa a execução e `SpanContext` cada etapa. São registrados rota, status, duração, serviço, tarefa/agente, tokens, custo disponível, erros e timeouts. A área Observabilidade do perfil Desenvolvedor exibe os dez traces mais recentes, métricas agregadas, serviços, tarefas e detalhes sanitizados. O log local fica em `logs/observability.jsonl`.
 
-Com `LANGFUSE_ENABLED=true` e credenciais apenas no `.env`, o `ObservabilityStore` envia observações agregadas ao Langfuse; sem a flag ou sem credenciais, o painel local continua funcionando. O envio não inclui PII, currículo bruto, prompts privados, respostas completas ou chain-of-thought. Os cinco traces apresentados neste relatório são **traces reais de execução da interface do SkillGraph**, gerados por perguntas efetivamente processadas pelas rotas do sistema. Nenhum deles foi criado por fixture, script sintético ou dado artificial de observabilidade. Os dados de negócio continuam sendo sintéticos por segurança, mas as execuções, durações, status, rotas e spans são reais. A captura do dashboard Langfuse foi salva como `docs/assets/langfuse-five-traces.png`. Cada trace permite comparar rota, duração, status e spans sem expor conteúdo privado.
+Com `LANGFUSE_ENABLED=true` e credenciais apenas no `.env`, o `ObservabilityStore` envia observações agregadas ao Langfuse; sem a flag ou sem credenciais, o painel local continua funcionando. O envio não inclui PII, currículo bruto, prompts privados, respostas completas ou chain-of-thought. Os cinco traces apresentados neste relatório são **traces reais de execução da interface do SkillGraph**, gerados por perguntas efetivamente processadas pelas rotas do sistema. A captura do dashboard Langfuse foi salva como `docs/assets/langfuse-five-traces.png`. 
 
-No projeto autenticado do Langfuse, filtre pela última hora para consultar as cinco execuções antes de capturar a tela. O painel local da aplicação permanece disponível em **Perfil desenvolvedor → Observabilidade**.
-
-O script `scripts/generate-langfuse-traces.py` existe apenas como ferramenta técnica de diagnóstico e não foi usado para produzir a evidência visual entregue neste relatório.
-
-A imagem abaixo é a evidência visual da integração. Ela mostra cinco traces reais gerados pela interface do SkillGraph em rotas diferentes. Cada trace permite comparar rota, status, duração e spans sem expor conteúdo privado.
+No projeto autenticado do Langfuse, foi filtrado pela última hora para consultar as cinco execuções antes de capturar a tela. A imagem abaixo é a evidência visual da integração. Ela mostra cinco traces reais gerados pela interface do SkillGraph em rotas diferentes. Cada trace permite comparar rota, status, duração e spans sem expor conteúdo privado.
 
 ![Cinco traces reais do SkillGraph no Langfuse](assets/langfuse-five-traces.png)
-
-Para reproduzir a captura, configure as chaves no `.env`, reinicie o Streamlit, execute cinco perguntas pela interface e filtre o dashboard Langfuse por `Past 1 hour`. O painel externo fica no `LANGFUSE_BASE_URL`; o painel local da aplicação permanece em **Perfil desenvolvedor → Observabilidade**.
-
-A imagem versionada em `docs/assets/langfuse-five-traces.png` é a evidência entregue com este relatório.
 
 ## 5. Golden Dataset e DeepEval
 
 O arquivo `evals/golden_dataset.jsonl` contém **25 casos** de RAG, SQL, segurança, PII, injection, ML, lacunas, treinamentos, política, multi-turno e fora de escopo. `evals/agent_goldens.jsonl` acrescenta quatro cenários compostos de agentes. O script `scripts/evaluate-ai.py` valida schema, rota e bloqueio sem consumir tokens. Os casos semânticos ficam em `evals/rag_goldens.jsonl`, com resposta, contexto e ground truth.
 
 O runner `scripts/evaluate-ai-live.py` usa DeepEval como LLM-as-a-judge e calcula Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall. O adapter usa o modelo local configurado no endpoint OpenAI-compatible. O arquivo semântico agora contém **doze casos RAG**, todos com resposta, contexto e ground truth, permitindo avaliar pelo menos dez perguntas no runner live. Os resultados efetivos ficam em `output/evaluation/live_ai_report.json` após a execução.
-O relatório é exibido em “Qualidade e Evals”. A execução realizada avaliou 12 casos e todos passaram o limiar configurado de 0,50. As médias foram: Faithfulness **0,9514**, Answer Relevancy **0,9236**, Contextual Precision **1,0000** e Contextual Recall **0,8810**; a taxa geral de aprovação foi **100%**. As menores pontuações foram Faithfulness 0,6667 e Answer Relevancy 0,5000 no caso `rag-gold-007`, Contextual Recall 0,5000 nos casos `rag-gold-003` e `rag-gold-004`, e Contextual Recall 0,5714 no caso `rag-gold-010`. Esses pontos são weaknesses para revisão, não evidência de perfeição. Resultados são evidência complementar, não garantia absoluta.
+O relatório é exibido em “Qualidade e Evals”. A execução realizada recentemente avaliou 12 casos e todos passaram o limiar configurado de 0,50. As médias foram: Faithfulness **0,9514**, Answer Relevancy **0,9236**, Contextual Precision **1,0000** e Contextual Recall **0,8810**; a taxa geral de aprovação foi **100%**. As menores pontuações foram Faithfulness 0,6667 e Answer Relevancy 0,5000 no caso `rag-gold-007`, Contextual Recall 0,5000 nos casos `rag-gold-003` e `rag-gold-004`, e Contextual Recall 0,5714 no caso `rag-gold-010`. Esses pontos são weaknesses para revisão e oportunidade para melhorias no contexto dos documentos, system prompt, configuração de chunking ou roteamento.
 
 Scores por caso registrados no relatório live:
 
@@ -79,8 +71,6 @@ Scores por caso registrados no relatório live:
 
 O judge registrado foi `meta-llama-3-8b-instruct`, com 12 casos avaliados e 12 aprovados.
 O relatório detalhado está em `output/evaluation/live_ai_report.json` e registra o judge `meta-llama-3-8b-instruct`, o dataset, cada caso, cada métrica, razões do judge e recomendações.
-
-DeepEval significa **DeepEval**; “Deep Evil” não é o nome da ferramenta.
 
 ## 6. Conclusão
 
