@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.evaluation_ai import evaluate_offline, load_golden_cases
+from src.evaluation_runner import run_deterministic_evaluation  # noqa: E402
 
 
 def main() -> None:
@@ -23,24 +23,9 @@ def main() -> None:
         "--output", type=Path, default=Path("output/evaluation/ai_quality_report.json")
     )
     args = parser.parse_args()
-    cases = load_golden_cases(args.dataset)
-    results = [evaluate_offline(case) for case in cases]
-    report = {
-        "mode": "offline",
-        "total": len(results),
-        "passed_schema": sum(not item["schema_errors"] for item in results),
-        "results": results,
-        "DeepEval_metrics": [
-            "faithfulness",
-            "answer_relevancy",
-            "context_precision",
-            "context_recall",
-        ],
-        "live_mode": "Use a separate explicit runner with configured judge credentials.",
-    }
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    report = run_deterministic_evaluation(
+        dataset_path=args.dataset,
+        output_path=args.output,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

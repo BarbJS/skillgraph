@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import re
@@ -11,7 +12,39 @@ from typing import Any
 
 import requests
 
-from src.ml_pipeline import load_artifact, normalize_skill_name, recommend_from_profile
+
+def normalize_skill_name(name: str) -> str:
+    from src.ml_inference import normalize_skill_name as _normalize_skill_name
+
+    return _normalize_skill_name(name)
+
+
+def _validate_cached_artifact(artifact: dict[str, Any]) -> None:
+    from src.ml_inference import ONET_VERSION
+
+    if artifact.get("onet_version") != ONET_VERSION or "track_profiles" not in artifact:
+        raise ValueError(
+            "Artefato incompatível: gere o modelo de competências O*NET novamente."
+        )
+
+
+def load_artifact(path: Path) -> dict[str, Any]:
+    from src.ml_inference import load_artifact as _load_artifact
+
+    artifact = _load_artifact(path)
+    _validate_cached_artifact(artifact)
+    return artifact
+
+
+def recommend_from_profile(
+    artifact_path: Path,
+    skills: dict[str, float],
+    *,
+    artifact: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    from src.ml_inference import recommend_from_profile as _recommend_from_profile
+
+    return _recommend_from_profile(artifact_path, skills, artifact=artifact)
 
 
 INTERPRETER_PROMPT = """Você é o interpretador da área de desenvolvimento de colaboradores do SkillGraph.
@@ -62,9 +95,7 @@ def _json_object(raw: str) -> dict[str, Any]:
         try:
             value = json.loads(match.group(0))
         except json.JSONDecodeError as nested:
-            raise MLAssistantError(
-                "O interpretador retornou JSON inválido."
-            ) from nested
+            raise MLAssistantError("O interpretador retornou JSON inválido.") from nested
     if not isinstance(value, dict):
         raise MLAssistantError("O interpretador retornou um objeto inesperado.")
     return value
@@ -73,9 +104,7 @@ def _json_object(raw: str) -> dict[str, Any]:
 def _coerce_profile(value: dict[str, Any]) -> dict[str, Any]:
     skills = value.get("skills")
     if not isinstance(skills, dict) or not skills:
-        raise MLAssistantError(
-            "Informe pelo menos uma competência observada no colaborador."
-        )
+        raise MLAssistantError("Informe pelo menos uma competência observada no colaborador.")
     clean: dict[str, float] = {}
     for name, level in skills.items():
         if not str(name).strip():
@@ -83,28 +112,15 @@ def _coerce_profile(value: dict[str, Any]) -> dict[str, Any]:
         try:
             numeric = float(level)
         except (TypeError, ValueError) as exc:
-            raise MLAssistantError(
-                f"O nível informado para {name} precisa ser de 0 a 5."
-            ) from exc
+            raise MLAssistantError(f"O nível informado para {name} precisa ser de 0 a 5.") from exc
         if not 0 <= numeric <= 5:
-            raise MLAssistantError(
-                f"O nível informado para {name} precisa estar entre 0 e 5."
-            )
+            raise MLAssistantError(f"O nível informado para {name} precisa estar entre 0 e 5.")
         clean[normalize_skill_name(str(name))] = numeric
     if not clean:
-        raise MLAssistantError(
-            "Informe pelo menos uma competência observada no colaborador."
-        )
-    context = str(
-        value.get("employee_context") or "colaborador não identificado"
-    ).strip()
-    if any(
-        token in context.casefold()
-        for token in ("cpf", "email", "e-mail", "telefone", "nome completo")
-    ):
-        raise MLAssistantError(
-            "Use apenas um rótulo não identificador para o colaborador."
-        )
+        raise MLAssistantError("Informe pelo menos uma competência observada no colaborador.")
+    context = str(value.get("employee_context") or "colaborador não identificado").strip()
+    if any(token in context.casefold() for token in ("cpf", "email", "e-mail", "telefone", "nome completo")):
+        raise MLAssistantError("Use apenas um rótulo não identificador para o colaborador.")
     return {
         "employee_context": context,
         "skills": clean,
@@ -123,20 +139,18 @@ class LocalMLAssistant:
         model: str | None = None,
         api_key: str | None = None,
         session: requests.Session | None = None,
+        artifact: dict[str, Any] | None = None,
     ) -> None:
         host = os.getenv("LM_STUDIO_HOST", "127.0.0.1")
         port = os.getenv("LM_STUDIO_PORT", "1234")
         self.base_url = (base_url or f"http://{host}:{port}/v1").rstrip("/")
-        self.model = model or os.getenv(
-            "LM_STUDIO_CHAT_MODEL", "meta-llama-3-8b-instruct"
-        )
+        self.model = model or os.getenv("LM_STUDIO_CHAT_MODEL", "meta-llama-3-8b-instruct")
         self.api_key = api_key or os.getenv("LM_STUDIO_API_KEY", "lm-studio-local")
         self.artifact_path = artifact_path
         self.session = session or requests.Session()
+        self.artifact = artifact
 
-    def _completion(
-        self, messages: list[dict[str, str]], json_mode: bool = False
-    ) -> str:
+    def _completion(self, messages: list[dict[str, str]], json_mode: bool = False) -> str:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -159,16 +173,8 @@ class LocalMLAssistant:
                 return self._completion(messages, False)
             response.raise_for_status()
             return str(response.json()["choices"][0]["message"]["content"])
-        except (
-            requests.RequestException,
-            KeyError,
-            IndexError,
-            TypeError,
-            ValueError,
-        ) as exc:
-            raise MLAssistantError(
-                "Não foi possível consultar o modelo local."
-            ) from exc
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise MLAssistantError("Não foi possível consultar o modelo local.") from exc
 
     def predict_from_question(self, question: str) -> MLAssistantResult:
         if not question.strip():
@@ -184,18 +190,22 @@ class LocalMLAssistant:
         )
         if interpretation.get("action") == "clarify":
             return MLAssistantResult(
-                str(
-                    interpretation.get("question")
-                    or "Descreva as competências do colaborador."
-                ),
+                str(interpretation.get("question") or "Descreva as competências do colaborador."),
                 raw_action="clarify",
             )
         if interpretation.get("action") != "recommend_track":
             raise MLAssistantError("A ação solicitada não é permitida nesta área.")
         profile = _coerce_profile(interpretation)
         try:
-            load_artifact(self.artifact_path)
-            structured = recommend_from_profile(self.artifact_path, profile["skills"])
+            artifact = self.artifact or load_artifact(self.artifact_path)
+            recommendation_kwargs = {"artifact": artifact}
+            if "artifact" not in inspect.signature(recommend_from_profile).parameters:
+                recommendation_kwargs = {}
+            structured = recommend_from_profile(
+                self.artifact_path,
+                profile["skills"],
+                **recommendation_kwargs,
+            )
         except (FileNotFoundError, ValueError, OSError, KeyError) as exc:
             raise MLAssistantError(
                 "O modelo de competências não está disponível. O administrador deve preparar o artefato O*NET."
@@ -212,10 +222,7 @@ class LocalMLAssistant:
             answer = self._completion(
                 [
                     {"role": "system", "content": EXPLAINER_PROMPT},
-                    {
-                        "role": "user",
-                        "content": f"Resultado calculado pelo backend:\n{context}",
-                    },
+                    {"role": "user", "content": f"Resultado calculado pelo backend:\n{context}"},
                 ]
             )
         except MLAssistantError:

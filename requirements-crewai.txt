@@ -1,0 +1,3 @@
+# Optional multi-agent runtime.
+-r requirements-base.txt
+crewai==0.203.2

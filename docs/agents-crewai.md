@@ -76,7 +76,19 @@ Nenhuma configuração manual de agente no site TypeSafe é necessária para a A
 
 ## Upload e OCR
 
-O upload de currículo ocorre no chat principal: o PDF é salvo temporariamente, extraído localmente com PyMuPDF e, se necessário, processado pelo OCR local. O arquivo temporário é apagado ao final da extração. A aba ML continua dedicada à recomendação manual de trilhas. O CrewAI/JEV desativado não faz chamadas externas.
+O upload de currículo ocorre no chat principal: o PDF é salvo temporariamente, extraído localmente com PyMuPDF e, se necessário, processado pelo OCR local. O arquivo temporário é apagado ao final da extração. O estado do Streamlit mantém apenas texto em memória e metadados seguros (`used_ocr`, páginas e método), nunca os bytes do PDF. A interface mostra o método e exige confirmação em **Enviar análise** antes de chamar JEV/CrewAI. A aba ML continua dedicada à recomendação manual de trilhas.
+
+Para OCR, configure `OCR_LANG` (padrão `eng`), `OCR_MAX_PAGES`, `OCR_ENABLED` e, quando necessário, `TESSERACT_CMD`. O idioma escolhido precisa aparecer em `tesseract --list-langs`; `RESUME_MAX_SIZE_MB` controla o limite do upload.
+
+O JEV é chamado uma vez pelo backend, depois da redação de PII. A UI diferencia JEV desabilitado/sem chave, falha TLS/HTTP, resposta inválida e falha do modelo local. O sucesso só é registrado quando todas as etapas terminam; um erro nunca é mascarado como análise concluída.
+
+O CrewAI/JEV desativado não faz chamadas externas. O default de código é offline (`CREWAI_ENABLED=false`); para a execução integrada, habilite explicitamente `CREWAI_ENABLED=true` no `.env`. Recomenda-se testar primeiro um PDF textual sintético, depois um PDF escaneado e só então executar uma chamada JEV live com credencial autorizada.
+
+### Síntese final obrigatória com Gemini
+
+A aplicação usa o Gemini obrigatoriamente somente na redação final. Os agentes, o JEV, OCR e a revisão continuam locais. A chamada recebe somente o rascunho local e dados estruturados sanitizados. PDF, currículo bruto, PII e resposta bruta do JEV não são enviados. Se a chave faltar ou o Gemini falhar, o rascunho local não é apresentado como resposta final: a execução exibe um diagnóstico e pede correção da configuração. A observação é registrada como `gemini.final_synthesis`, usando `usageMetadata` para tokens; o custo depende das tarifas configuradas. O LLM-as-a-judge continua separado e não muda.
+
+A aba ML continua dedicada à recomendação manual de trilhas. O CrewAI/JEV desativado não faz chamadas externas.
 
 ## Execução local
 

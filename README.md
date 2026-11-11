@@ -475,11 +475,36 @@ Acesse `http://localhost/install`, configure o provider LM Studio, cadastre chat
 
 ### 4. Dependências e Machine Learning
 
+Os perfis de dependência são separados para reduzir o tamanho do runtime:
+
+- `requirements.txt`: produção base;
+- `requirements-crewai.txt`: runtime multiagente;
+- `requirements-ml.txt`: inferência, XAI e treinamento O*NET/FLAML;
+- `requirements-evals.txt`: DeepEval;
+- `requirements-dev.txt`: todos os grupos e ferramentas de desenvolvimento.
+
+Para o ambiente completo de desenvolvimento:
+
 ```bash
 make bootstrap-crewai
 make bootstrap-flaml
 make train-ml
 ```
+
+Para um runtime base sem treinamento, CrewAI e DeepEval:
+
+```bash
+make install-prod
+```
+
+Adicione somente os grupos necessários ao serviço implantado com `make install-ml`, `make install-evals` ou a instalação correspondente do ambiente.
+
+O benchmark de tempo e memória do processo está em `scripts/benchmark-performance.py`; consulte [docs/performance-platform.md](docs/performance-platform.md).
+
+```bash
+.venv/bin/python scripts/benchmark-performance.py --runs 3
+```
+
 
 O treinamento gera o artefato local `.ml_artifacts/skillgraph_competency_tracks.pkl`.
 
@@ -533,7 +558,31 @@ Envie um PDF sintético com:
 Analise este currículo para desenvolvimento profissional.
 ```
 
-Fluxo: PDF → PyMuPDF/OCR → sanitização → JEV opcional → Resume Interpreter → Profile Normalizer → Reviewer → Synthesizer.
+Fluxo: PDF temporário → PyMuPDF/OCR local → sanitização → JEV opcional → Resume Interpreter → Profile Normalizer → Reviewer → Synthesizer. Após o upload, a interface mostra o método (`texto nativo` ou `OCR local`) e pede confirmação em **Enviar análise**; o PDF e seus bytes não ficam no estado da sessão.
+
+Para PDFs escaneados, o Tesseract precisa estar instalado e o idioma configurado em `OCR_LANG` (o padrão é `eng`). No ambiente local, confirme `tesseract --list-langs`; se `por` não aparecer, use `OCR_LANG=eng` ou instale o pacote de português. `OCR_MAX_PAGES` limita o custo do OCR e `RESUME_MAX_SIZE_MB` limita o upload.
+
+O JEV é executado uma única vez pelo backend depois da extração e redação de PII. `JEV_ENABLED=true` e `TYPESAFE_API_KEY` habilitam a chamada; sem isso, a análise estruturada é interrompida com diagnóstico explícito, sem fingir sucesso. O texto bruto do currículo nunca é enviado para a resposta final ou para a observabilidade.
+
+Diagnóstico rápido antes de usar um PDF real:
+
+```bash
+.venv/bin/python -m pytest -q tests/test_resume_extractor.py tests/test_resume_upload.py tests/test_jev_client.py
+.venv/bin/python -m streamlit run app.py
+```
+
+Comece com um PDF textual sintético; depois teste um PDF escaneado. A etapa JEV live não deve ser executada em teste sem uma credencial autorizada.
+
+### Síntese final obrigatória com Gemini
+
+O CrewAI e os agentes continuam usando o LM Studio local. Se a demonstração precisar mostrar tokens e custo de uma API externa no Langfuse, habilite somente a síntese final com Gemini:
+
+```env
+GEMINI_API_KEY=sua-chave-local
+GEMINI_MODEL=gemini-2.5-flash
+```
+
+Essa etapa recebe apenas o rascunho e os dados estruturados sanitizados; não recebe PDF, bytes, currículo bruto, PII ou resposta bruta do JEV. Toda resposta elaborada deve passar pelo Gemini; se a chave faltar ou a API falhar, a execução é interrompida com diagnóstico, sem apresentar o rascunho local como resposta final. O uso do Gemini aparece no trace como `gemini.final_synthesis`; tokens vêm do `usageMetadata` da API. O custo só é calculado quando as tarifas `GEMINI_INPUT_USD_PER_1M` e `GEMINI_OUTPUT_USD_PER_1M` forem configuradas. O LLM-as-a-judge permanece separado e não é alterado.
 
 ### Machine Learning
 
@@ -562,7 +611,7 @@ make evaluate-ai
 Para a avaliação live, que pode consumir tokens:
 
 ```bash
-.crew-venv/bin/python scripts/evaluate-ai-live.py \
+.venv/bin/python scripts/evaluate-ai-live.py \
   --deepeval \
   --yes-live \
   --dataset evals/rag_goldens.jsonl \
@@ -572,7 +621,7 @@ Para a avaliação live, que pode consumir tokens:
 Para validar a conexão Langfuse sem expor chaves:
 
 ```bash
-.crew-venv/bin/python scripts/validate-langfuse-connection.py
+.venv/bin/python scripts/validate-langfuse-connection.py
 ```
 
 ## 🧪 Testes e qualidade de código
@@ -586,6 +635,15 @@ make ci
 A suíte cobre roteamento, guardrails, Dify/SSE, DuckDB read-only, ML/PKL/XAI, CrewAI, JEV mockado, PDF/OCR, estado multi-turno, observabilidade, Langfuse sanitizado, dashboard, Golden Dataset e UI.
 
 ## 🛡️ Segurança, privacidade e limites
+
+### Decisão sobre LLM Guard
+
+O projeto avaliou e tentou integrar o **LLM Guard** como uma camada complementar de segurança para prompt injection, jailbreak, PII, secrets e toxicidade. A integração não foi mantida no ambiente oficial porque suas dependências transitivas entraram em conflito com versões obrigatórias do CrewAI, DeepEval e componentes do stack de ML, especialmente `json-repair`, `click`, `numpy`, `regex` e pacotes relacionados ao spaCy. Manter o LLM Guard nessas condições reduziria a reprodutibilidade e poderia quebrar o runtime principal.
+
+Por essa razão, o LLM Guard foi removido do código, das dependências e da execução da aplicação neste momento. Em seu lugar, os guardrails determinísticos foram fortalecidos: a aplicação mantém bloqueios de PII, prompt injection, jailbreak, secrets, toxicidade, SQL destrutivo e decisões trabalhistas; adicionou uma camada central de validação de saída; ampliou a detecção de tokens e credenciais; e mantém casos sintéticos de segurança no Golden Dataset para regressão periódica. Essa decisão é explícita e reversível: uma futura adoção deverá ocorrer em ambiente isolado ou quando houver uma combinação de versões compatível, sem contaminar o ambiente oficial.
+
+O DeepEval permanece ativo para avaliação semântica de qualidade — Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall — mas não é usado como bloqueio de segurança online.
+
 
 - `.env`, `.dify/`, bancos, logs, modelos e artefatos locais não fazem parte do pacote público;
 - chaves do Dify, JEV e Langfuse nunca devem ser commitadas;

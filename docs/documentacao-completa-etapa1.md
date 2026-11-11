@@ -111,7 +111,7 @@ O Dify fica em `http://localhost` e o Streamlit em `http://localhost:8501`.
 
 ```bash
 pytest -q tests
-python -m src.evaluation
+make evaluate-ai
 ```
 
 A demonstração da Etapa 1 deve apresentar:

@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from src.ml_pipeline import load_artifact
+from src.ml_inference import load_artifact
 
 
 def _metric_rows(metrics: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -47,8 +47,14 @@ def _wrapped_importances(model: Any) -> np.ndarray | None:
     return None
 
 
-def model_diagnostics(path: Path) -> dict[str, Any]:
-    artifact = load_artifact(path)
+def model_diagnostics(
+    path: Path, *, artifact: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    artifact = artifact or load_artifact(path)
+
+    # The caller may provide a cached artifact so diagnostics do not deserialize
+    # the model a second time in the same Streamlit interaction.
+
     validation = artifact.get("validation_metrics") or {}
     test = artifact.get("test_metrics") or {}
     validation_f1 = validation.get("macro_f1")

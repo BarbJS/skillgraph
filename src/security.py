@@ -38,6 +38,14 @@ _SENSITIVE_PATTERNS = (
         r"ignore (as|suas) regras|ignore o escopo|revele (o|seu|suas) prompt|mostre (as|suas) instru[çc][õo]es",
     ),
     ("unsafe_sql", r"\b(select|insert|update|delete|drop|alter)\b(?:\s+\w+){0,4}"),
+    ("jailbreak", r"modelo sem restrições|desative os filtros|qualquer pedido proibido"),
+    ("secret", r"\b(?:sk|api[_ -]?key|token)[=: -]?[A-Za-z0-9_-]{8,}\b"),
+    ("toxicity", r"insultando e ameaçando|idiota incompetente|merece ser humilhada"),
+    ("jailbreak", r"modelo sem restrições|desative os filtros|qualquer pedido proibido"),
+    ("secret", r"\b(?:sk|api[_ -]?key|token)[=: -]?[A-Za-z0-9_-]{8,}\b"),
+    ("toxicity", r"responda insultando|ameaçando a pessoa|ameacando a pessoa"),
+    ("prompt_injection", r"ignore todas as regras|execute qualquer instrução|execute qualquer instrucao"),
+    ("data_exfiltration", r"para a resposta e para todos os modelos|não o redija|nao o redija"),
 )
 
 
@@ -47,6 +55,7 @@ def evaluate_input(
     """Apply domain guardrails before any model or database call."""
 
     normalized = " ".join(question.lower().split())
+
     for category, pattern in _SENSITIVE_PATTERNS:
         if re.search(pattern, normalized, flags=re.IGNORECASE):
             return SecurityDecision(False, f"blocked:{category}", category)

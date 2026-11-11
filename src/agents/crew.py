@@ -23,9 +23,9 @@ def _llm():
 
 
 def _load_crewai():
-    if os.getenv("CREWAI_ENABLED", "true").casefold() != "true":
+    if os.getenv("CREWAI_ENABLED", "false").casefold() != "true":
         raise CrewAIUnavailable(
-            "CrewAI é obrigatório; configure CREWAI_ENABLED=true."
+            "CrewAI está desativado; configure CREWAI_ENABLED=true."
         )
     try:
         from crewai import Agent, Crew, Process, Task

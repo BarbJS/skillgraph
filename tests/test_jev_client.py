@@ -43,3 +43,22 @@ def test_enabled_jev_builds_systemone_payload():
     assert result.answers["x"]["noul"] == 1.0
     assert session.payload[0].endswith("/systemone")
     assert session.payload[1]["json"]["model"] == "jev-latest"
+
+
+def test_jev_diagnostics_never_exposes_api_key():
+    result = JevClient(enabled=True, api_key="secret-key").diagnostics()
+    assert result["configured"] is True
+    assert "secret-key" not in str(result)
+
+
+def test_jev_rejects_protected_pii_before_request():
+    session = Session()
+    try:
+        JevClient(enabled=True, api_key="test", session=session).analyze(
+            {"document_text": "contato pessoa@example.com"}, {"x": {"type": "noul"}}
+        )
+    except JevError as exc:
+        assert "dados pessoais" in str(exc)
+    else:
+        raise AssertionError("JEV must reject PII before sending")
+    assert session.payload is None

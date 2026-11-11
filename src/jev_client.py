@@ -1,12 +1,14 @@
 """Optional TypeSafe/JEV adapter with confidence telemetry."""
 
 from __future__ import annotations
+
 import json
 import os
 from dataclasses import dataclass
 from typing import Any
+
 import requests
-from src.privacy import sanitize, contains_protected_pii
+from src.privacy import contains_protected_pii, sanitize
 
 try:
     import truststore
@@ -23,7 +25,17 @@ def _request_verify() -> bool | str:
 
 def _request_error_message(exc: Exception) -> str:
     if isinstance(exc, requests.exceptions.SSLError):
-        return "A chamada ao JEV falhou na validação TLS; instale/atualize a cadeia de certificados do ambiente."
+        return (
+            "A chamada ao JEV falhou na validação TLS; instale/atualize a cadeia "
+            "de certificados do ambiente."
+        )
+    if isinstance(exc, requests.exceptions.Timeout):
+        return "A chamada ao JEV excedeu o tempo limite configurado."
+    if isinstance(exc, requests.exceptions.HTTPError):
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None)
+        if status:
+            return f"O JEV recusou a solicitação (HTTP {status})."
     return "A chamada ao JEV não foi concluída."
 
 
@@ -41,15 +53,15 @@ class JevResponse:
     confidence_min: float | None
 
 
-def _confidence(answers):
+def _confidence(answers: dict[str, Any]) -> dict[str, float]:
     values = {}
-    for key, a in answers.items():
-        if not isinstance(a, dict):
+    for key, answer in answers.items():
+        if not isinstance(answer, dict):
             continue
         value = (
-            a.get("confidence")
-            if a.get("confidence") is not None
-            else (a.get("noul") if a.get("type") == "noul" else None)
+            answer.get("confidence")
+            if answer.get("confidence") is not None
+            else (answer.get("noul") if answer.get("type") == "noul" else None)
         )
         if isinstance(value, (int, float)):
             values[str(key)] = max(0, min(1, float(value)))
@@ -78,9 +90,27 @@ class JevClient:
             base_url or os.getenv("JEV_API_BASE_URL", "https://api.typesafe.ai/v1")
         ).rstrip("/")
         self.model = model or os.getenv("JEV_MODEL", "jev-latest")
-        self.timeout = timeout or float(os.getenv("JEV_TIMEOUT_SECONDS", "60"))
+        raw_timeout = timeout if timeout is not None else os.getenv("JEV_TIMEOUT_SECONDS", "60")
+        try:
+            self.timeout = float(raw_timeout)
+        except (TypeError, ValueError) as exc:
+            raise JevError("JEV_TIMEOUT_SECONDS deve ser numérico.") from exc
+        if self.timeout <= 0:
+            raise JevError("JEV_TIMEOUT_SECONDS deve ser maior que zero.")
         self.session = session or requests.Session()
         self.trace = trace
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Return safe configuration details for the UI and support logs."""
+
+        return {
+            "enabled": bool(self.enabled),
+            "configured": bool(self.api_key),
+            "base_url": self.base_url,
+            "model": self.model,
+            "timeout_seconds": self.timeout,
+            "tls_verification": _request_verify(),
+        }
 
     def analyze(self, state, questions):
         if not self.enabled:
@@ -89,10 +119,11 @@ class JevClient:
             )
         if not self.api_key:
             raise JevError("TYPESAFE_API_KEY não configurada.")
-        if contains_protected_pii(str(state)):
+        if contains_protected_pii(json.dumps(state, ensure_ascii=False)):
             raise JevError(
                 "O state contém dados pessoais; remova-os antes de usar o JEV."
             )
+
         span = (
             self.trace.span("jev.systemone", "jev", task_name="systemone")
             if self.trace
@@ -101,7 +132,7 @@ class JevClient:
         if span:
             span.__enter__()
         try:
-            r = self.session.post(
+            response = self.session.post(
                 f"{self.base_url}/systemone",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
@@ -115,46 +146,52 @@ class JevClient:
                 timeout=self.timeout,
                 verify=_request_verify(),
             )
-            r.raise_for_status()
-            body = r.json()
-        except (requests.RequestException, ValueError) as exc:
+            response.raise_for_status()
+            body = response.json()
+            if not isinstance(body, dict) or not isinstance(body.get("answers"), dict):
+                raise JevError("O JEV retornou um formato inesperado.")
+            values = _confidence(body["answers"])
+            mean = sum(values.values()) / len(values) if values else None
+            minimum = min(values.values()) if values else None
+            usage = body.get("usage", {})
+            if not isinstance(usage, dict):
+                usage = {}
             if span:
-                span.__exit__(type(exc), exc, exc.__traceback__)
+                span.set_usage(
+                    input_tokens=int(usage.get("input_tokens", 0) or 0),
+                    output_tokens=int(usage.get("output_tokens", 0) or 0),
+                    cost=0.0,
+                )
+                span.metadata.update(
+                    {
+                        "confidence_mean": mean,
+                        "confidence_min": minimum,
+                        "confidence_by_question": values,
+                    }
+                )
+            return JevResponse(
+                str(body.get("model", self.model)),
+                body["answers"],
+                usage,
+                values,
+                mean,
+                minimum,
+            )
+        except JevError:
+            raise
+        except (requests.RequestException, ValueError, TypeError) as exc:
             raise JevError(_request_error_message(exc)) from exc
-        if not isinstance(body, dict) or not isinstance(body.get("answers"), dict):
+        finally:
             if span:
-                span.__exit__(ValueError, ValueError("invalid response"), None)
-            raise JevError("O JEV retornou um formato inesperado.")
-        values = _confidence(body["answers"])
-        mean = sum(values.values()) / len(values) if values else None
-        minimum = min(values.values()) if values else None
-        usage = body.get("usage", {})
-        if span:
-            span.set_usage(
-                input_tokens=int(usage.get("input_tokens", 0)),
-                output_tokens=int(usage.get("output_tokens", 0)),
-                cost=0.0,
-            )
-            span.metadata.update(
-                {
-                    "confidence_mean": mean,
-                    "confidence_min": minimum,
-                    "confidence_by_question": values,
-                }
-            )
-            span.__exit__(None, None, None)
-        return JevResponse(
-            str(body.get("model", self.model)),
-            body["answers"],
-            usage,
-            values,
-            mean,
-            minimum,
-        )
+                span.__exit__(*__import__("sys").exc_info())
 
     @staticmethod
     def load_questions(path):
-        value = json.loads(open(path, encoding="utf-8").read())
+        try:
+            with open(path, encoding="utf-8") as stream:
+                value = json.load(stream)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise JevError("Não foi possível carregar as perguntas do JEV.") from exc
         if not isinstance(value, dict):
             raise JevError("O arquivo de perguntas JEV deve conter um objeto JSON.")
         return value

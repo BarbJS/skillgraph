@@ -26,11 +26,19 @@ def render_observability() -> None:
 
     OBSERVABILITY.refresh()
     snapshot = OBSERVABILITY.snapshot()
-    cols = st.columns(4)
-    cols[0].metric("Traces", snapshot["traces"])
-    cols[1].metric("P95 (ms)", snapshot["latency_p95_ms"])
-    cols[2].metric("Erros", f"{snapshot['error_rate']:.2%}")
-    cols[3].metric("Timeouts", f"{snapshot['timeout_rate']:.2%}")
+    # Use two rows so the six metrics keep enough horizontal space and do not
+    # get truncated by Streamlit's metric card layout.
+    first_row = st.columns(3)
+    first_row[0].metric("Traces", snapshot["traces"])
+    first_row[1].metric("P95 (ms)", f"{snapshot['latency_p95_ms']:.1f}")
+    first_row[2].metric("Média de tokens", f"{snapshot['average_tokens']:.1f}")
+
+    second_row = st.columns(3)
+    second_row[0].metric("Média de custo", f"{snapshot['average_cost']:.1f}")
+    second_row[1].metric("Erros", f"{snapshot['error_rate']:.1%}")
+    second_row[2].metric("Timeouts", f"{snapshot['timeout_rate']:.1%}")
+
+    st.caption("As médias de tokens e custo são calculadas por trace; custo igual a zero indica que o provider não informou preço ou não há tarifa configurada.")
 
     recent = OBSERVABILITY.recent_trace_rows(limit=10)
     st.subheader("10 traces mais recentes")

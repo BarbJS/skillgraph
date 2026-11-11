@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 load_dotenv(ROOT / ".env")
 
-from src.observability import OBSERVABILITY, TraceContext
+from src.observability import OBSERVABILITY, TraceContext  # noqa: E402
 
 
 def main() -> None:

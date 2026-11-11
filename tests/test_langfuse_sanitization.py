@@ -84,6 +84,59 @@ def test_langfuse_payload_is_aggregate_and_no_raw_content():
     assert "cost" in calls
 
 
+def test_langfuse_generation_payload_uses_usage_and_cost():
+    class FakeGeneration:
+        def __init__(self, kwargs):
+            self.kwargs = kwargs
+
+        def end(self):
+            pass
+
+    class FakeObservation:
+        def __init__(self, name):
+            self.name = name
+            self.calls = []
+
+        def update(self, **kwargs):
+            self.calls.append(kwargs)
+
+        def start_generation(self, **kwargs):
+            self.calls.append({"generation": kwargs})
+            return FakeGeneration(kwargs)
+
+        def end(self):
+            pass
+
+    class FakeLangfuse:
+        def __init__(self):
+            self.root = None
+            self.flushed = False
+
+        def start_span(self, **kwargs):
+            self.root = FakeObservation(kwargs["name"])
+            return self.root
+
+        def flush(self):
+            self.flushed = True
+
+    store = ObservabilityStore.__new__(ObservabilityStore)
+    store._langfuse = FakeLangfuse()
+    trace = TraceContext("resume_analysis", role="desenvolvedor", user_key="synthetic")
+    with trace.span(
+        "gemini.final_synthesis",
+        "gemini",
+        task_name="final_synthesis",
+        metadata={"observation_type": "generation", "model": "gemini-2.5-flash"},
+    ) as span:
+        span.set_usage(input_tokens=10, output_tokens=6, cost=0.000022)
+    trace.finish()
+    store._send_langfuse(trace)
+    generation = next(item["generation"] for item in store._langfuse.root.calls if "generation" in item)
+    assert generation["model"] == "gemini-2.5-flash"
+    assert generation["usage_details"] == {"input": 10, "output": 6, "total": 16}
+    assert generation["cost_details"] == {"total": 0.000022}
+
+
 def test_langfuse_sdk3_payload_uses_real_span_lifecycle():
     class FakeObservation:
         def __init__(self, name):
@@ -127,3 +180,25 @@ def test_langfuse_sdk3_payload_uses_real_span_lifecycle():
     assert store._langfuse.root.calls[-1] == {"end": True}
     assert store._langfuse.root.children[0][1].calls[-1] == {"end": True}
     assert store._langfuse.flushed is True
+
+
+def test_langfuse_is_not_initialized_when_store_is_created(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_ENABLED", "true")
+    store = ObservabilityStore()
+    assert store._langfuse is None
+
+
+def test_langfuse_initializes_on_first_record(monkeypatch):
+    monkeypatch.setenv("LANGFUSE_ENABLED", "true")
+    store = ObservabilityStore()
+
+    class FakeLangfuse:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+    monkeypatch.setitem(__import__("sys").modules, "langfuse", type("Module", (), {"Langfuse": FakeLangfuse}))
+    store._send_langfuse = lambda trace: None
+    trace = TraceContext("test", role="desenvolvedor", user_key="synthetic")
+    trace.finish()
+    store.record(trace)
+    assert isinstance(store._langfuse, FakeLangfuse)

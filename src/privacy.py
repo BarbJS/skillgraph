@@ -2,7 +2,35 @@
 
 from __future__ import annotations
 import re
+import unicodedata
 from typing import Any
+
+
+def _normalize(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).casefold()
+
+
+_SECRET_PATTERNS = (
+    re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{12,}"),
+    re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b"),
+    re.compile(r"\bAIza[A-Za-z0-9_-]{20,}\b"),
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{12,}\b"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    re.compile(r"(?i)\b(?:api[_ -]?key|secret|password|token|authorization)\s*[:=]\s*[^\s,;]{8,}"),
+    re.compile(r"(?i)(?:postgres|mysql|mongodb(?:\+srv)?|redis)://[^\s]+"),
+)
+
+def contains_secret(value: str) -> bool:
+    return any(pattern.search(value) for pattern in _SECRET_PATTERNS)
+
+
+def redact_secrets(value: str) -> str:
+    result = value
+    for pattern in _SECRET_PATTERNS:
+        result = pattern.sub("[REDACTED_SECRET]", result)
+    return result
+
 
 _PATTERNS = (
     (
@@ -25,6 +53,9 @@ _DECISION_PATTERN = re.compile(
 def redact_text(value: str) -> tuple[str, list[str]]:
     found: list[str] = []
     result = value
+    if contains_secret(result):
+        result = redact_secrets(result)
+        found.append("secret")
     for label, pattern in _PATTERNS:
         if pattern.search(result):
             found.append(label)

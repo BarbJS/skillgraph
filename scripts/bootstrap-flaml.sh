@@ -34,6 +34,6 @@ else
 fi
 
 printf '[INFO] Instalando FLAML e dependências no ambiente oficial Python 3.11\n'
-"${PYTHON_BIN}" -m pip install -r "${ROOT}/requirements.txt"
+"${PYTHON_BIN}" -m pip install -r "${ROOT}/requirements-ml.txt"
 "${PYTHON_BIN}" -m pip install -e "${FLAML_DIR}[automl]"
 printf '[INFO] Bootstrap do FLAML concluído\n'

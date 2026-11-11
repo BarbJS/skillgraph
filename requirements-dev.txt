@@ -1,4 +1,9 @@
--r requirements.txt
+# Development and CI environment: install all application capability groups plus tools.
+-r requirements-crewai.txt
+-r requirements-ml.txt
+-r requirements-evals.txt
 pre-commit==4.3.0
 black==25.9.0
 ruff==0.13.0
+pytest==8.4.2
+pytest-cov>=4.1.0

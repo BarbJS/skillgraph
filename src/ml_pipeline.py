@@ -37,13 +37,6 @@ from sklearn.metrics import (
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-try:
-    from flaml import AutoML, tune
-except Exception:  # pragma: no cover - allows the chat to start before setup
-    AutoML = None  # type: ignore[assignment,misc]
-    tune = None  # type: ignore[assignment,misc]
-
-
 ONET_VERSION = "31.0"
 ONET_SOURCE_URL = "https://www.onetcenter.org/database.html"
 ONET_LICENSE = "Creative Commons Attribution 4.0 International (CC BY 4.0)"
@@ -404,8 +397,10 @@ def _flaml_model(
     y_encoded = encoder.fit_transform(y)
     y_val_encoded = encoder.transform(y_val)
 
-    if AutoML is None:
-        raise RuntimeError("FLAML não instalado. Execute scripts/bootstrap-flaml.sh.")
+    try:
+        from flaml import AutoML
+    except Exception as exc:
+        raise RuntimeError("FLAML não instalado. Execute scripts/bootstrap-flaml.sh.") from exc
     automl = AutoML()
     settings: dict[str, Any] = {
         "task": "classification",
@@ -489,6 +484,10 @@ def fine_tune(
 ) -> tuple[Pipeline, ModelResult]:
     preprocessor, X, X_val, _, y, y_val, _ = _matrices(split, feature_names)
     custom_hp = None
+    try:
+        from flaml import tune
+    except Exception:
+        tune = None
     if tune is not None and selected.name == "rf":
         custom_hp = {
             "rf": {
@@ -585,148 +584,30 @@ def build_track_profiles(
     return profiles
 
 
-def normalize_skill_name(name: str) -> str:
-    normalized = " ".join(str(name).strip().casefold().split())
-    aliases = {
-        "python": "Programming",
-        "programação": "Programming",
-        "programming": "Programming",
-        "sql": "Database Management Systems",
-        "banco de dados": "Database Management Systems",
-        "bancos de dados": "Database Management Systems",
-        "análise de dados": "Data Analysis",
-        "analise de dados": "Data Analysis",
-        "data analysis": "Data Analysis",
-        "machine learning": "Machine Learning",
-        "aprendizado de máquina": "Machine Learning",
-        "comunicação": "Communication",
-        "resolução de problemas": "Complex Problem Solving",
-        "problem solving": "Complex Problem Solving",
-        "segurança da informação": "Information Security",
-        "cibersegurança": "Information Security",
-        "cloud": "Cloud Computing",
-        "computação em nuvem": "Cloud Computing",
-        "ia generativa": "Generative AI",
-        "generative ai": "Generative AI",
-    }
-    return aliases.get(normalized, str(name).strip())
+# Compatibility wrappers keep the historical training-module API without
+# importing the inference module during the training module's initialization.
+def global_explanation(*args, **kwargs):
+    from src.ml_inference import global_explanation as _global_explanation
+
+    return _global_explanation(*args, **kwargs)
 
 
-def _feature_aliases(feature_names: list[str]) -> dict[str, str]:
-    candidates = {
-        "Database Management Systems": (
-            "Database Management",
-            "Database Management Systems",
-        ),
-        "Data Analysis": ("Analyzing Data", "Data Analysis"),
-        "Information Security": ("Information Security",),
-        "Cloud Computing": ("Technology Design", "Cloud Computing"),
-        "Machine Learning": ("Programming", "Machine Learning"),
-    }
-    return {
-        alias: next((target for target in targets if target in feature_names), "")
-        for alias, targets in candidates.items()
-    }
+def map_profile_skills(*args, **kwargs):
+    from src.ml_inference import map_profile_skills as _map_profile_skills
+
+    return _map_profile_skills(*args, **kwargs)
 
 
-def map_profile_skills(
-    skills: dict[str, float], feature_names: list[str]
-) -> tuple[dict[str, float], list[dict[str, Any]], list[dict[str, Any]]]:
-    aliases = _feature_aliases(feature_names)
-    recognized, unrecognized, mapped = [], [], {}
-    for original, level in skills.items():
-        canonical = normalize_skill_name(original)
-        target = canonical if canonical in feature_names else aliases.get(canonical, "")
-        if target:
-            mapped[target] = float(level)
-            recognized.append(
-                {
-                    "input": original,
-                    "feature": target,
-                    "level": float(level),
-                    "mapped": original != target,
-                }
-            )
-        else:
-            unrecognized.append(
-                {
-                    "input": original,
-                    "canonical": canonical,
-                    "reason": "competência não presente no vocabulário do artefato",
-                }
-            )
-    return mapped, recognized, unrecognized
+def normalize_skill_name(*args, **kwargs):
+    from src.ml_inference import normalize_skill_name as _normalize_skill_name
+
+    return _normalize_skill_name(*args, **kwargs)
 
 
-def recommend_from_profile(
-    path: Path, skills: dict[str, float], top_k: int = 3
-) -> dict[str, Any]:
-    artifact = load_artifact(path)
-    feature_names = artifact["feature_names"]
-    mapped, recognized, unrecognized = map_profile_skills(skills, feature_names)
-    vector = {name: 0.0 for name in feature_names}
-    vector.update(mapped)
-    matrix = artifact["preprocessor"].transform(
-        pd.DataFrame([vector], columns=feature_names)
-    )
-    probabilities = artifact["model"].predict_proba(matrix)[0]
-    classes = list(artifact["model"].classes_)
-    order = np.argsort(probabilities)[::-1][:top_k]
-    recommendations = [
-        {"track": str(classes[index]), "compatibility": float(probabilities[index])}
-        for index in order
-    ]
-    margin = (
-        float(probabilities[order[0]] - probabilities[order[1]])
-        if len(order) > 1
-        else 1.0
-    )
-    best = recommendations[0]["track"] if recommendations else ""
-    profile = artifact["track_profiles"].get(best, {})
-    gaps = sorted(
-        (
-            (skill, max(0.0, float(level) - float(vector.get(skill, 0.0))))
-            for skill, level in profile.items()
-        ),
-        key=lambda item: item[1],
-        reverse=True,
-    )[:5]
-    try:
-        from src.ml_xai import local_tree_explanation
+def recommend_from_profile(*args, **kwargs):
+    from src.ml_inference import recommend_from_profile as _recommend_from_profile
 
-        local = local_tree_explanation(artifact["model"], matrix, feature_names, best)
-    except Exception:
-        local = []
-    return {
-        "recommendations": recommendations,
-        "priorities": [{"skill": skill, "gap": gap} for skill, gap in gaps if gap > 0],
-        "skills_received": skills,
-        "recognized_skills": recognized,
-        "unrecognized_skills": unrecognized,
-        "uncertainty": {
-            "margin": margin,
-            "level": (
-                "higher" if margin >= 0.2 else "moderate" if margin >= 0.08 else "lower"
-            ),
-            "needs_more_information": bool(unrecognized) or margin < 0.08,
-        },
-        "local_explanations": local,
-        "input_quality": {
-            "recognized_count": len(recognized),
-            "unrecognized_count": len(unrecognized),
-            "coverage": round(len(recognized) / max(len(skills), 1), 3),
-            "unknown_skills_do_not_affect_model": True,
-        },
-    }
-
-
-def global_explanation(path: Path, top_k: int = 15) -> list[dict[str, Any]]:
-    artifact = load_artifact(path)
-    from src.ml_xai import global_tree_importance
-
-    return global_tree_importance(
-        artifact["model"], artifact["feature_names"], top_k=top_k
-    )
+    return _recommend_from_profile(*args, **kwargs)
 
 
 def save_artifact(

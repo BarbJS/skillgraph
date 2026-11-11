@@ -13,8 +13,8 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 load_dotenv(ROOT / ".env")
 
-from src.alerting import AlertManager
-from src.observability import OBSERVABILITY, TraceContext
+from src.alerting import AlertManager  # noqa: E402
+from src.observability import OBSERVABILITY, TraceContext  # noqa: E402
 
 
 def main() -> None:

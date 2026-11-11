@@ -6,20 +6,17 @@ import html
 import os
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
-from dotenv import load_dotenv
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(PROJECT_ROOT / ".env")
-
 from typing import Any
 
 import pandas as pd
-from src.resume_extractor import ResumeExtractionError, extract_pdf_text
-from src.agents.runtime import run_agent_flow, run_agent_turn
-from src.agents.router import route_turn
 import streamlit as st
 import streamlit.components.v1 as components
+from dotenv import load_dotenv
+
+from src.agents.router import route_turn
+from src.agents.runtime import run_agent_turn
 from src.answer_router import (
     answer_comparison_question,
     answer_competency_question,
@@ -27,7 +24,60 @@ from src.answer_router import (
     answer_structured_question,
 )
 from src.dify_client import DifyClient, DifyClientError
+from src.error_ui import render_error_panel
+from src.gemini_synthesizer import GeminiSynthesisError
+from src.intent_router import Intent, route_question
+from src.ml_assistant import MLAssistantError
+from src.monitoring import record_event
+from src.observability import OBSERVABILITY, TraceContext
+from src.output_security import validate_user_output
+from src.privacy_ui import upload_privacy_notice
+from src.progress_ui import ResumeProgress
+from src.reasoning import route_steps
+from src.response_synthesis import synthesize_response
+from src.resume_extractor import ResumeExtractionError
+from src.resume_upload import extract_uploaded_resume
+from src.security import UserRole, evaluate_input
+from src.sql_tools import SQLToolError, SkillGraphDatabase
+from src.streamlit_resources import (
+    cached_database,
+    cached_feedback_store,
+    cached_ml_artifact,
+    cached_session_store,
+    resource_signature,
+)
+from src.toxicity import safe_response
 
+_STARTUP_PROFILE = os.getenv("STARTUP_PROFILE", "false").casefold() == "true"
+_STARTUP_STARTED = time.perf_counter()
+
+
+def _cached_artifact(path: Path) -> dict[str, Any]:
+    return cached_ml_artifact(str(path), resource_signature(path))
+
+
+def _startup_mark(label: str) -> None:
+    if _STARTUP_PROFILE:
+        elapsed_ms = (time.perf_counter() - _STARTUP_STARTED) * 1000
+        print(f"[startup] {label}: {elapsed_ms:.1f} ms", flush=True)
+
+
+@contextmanager
+def _loading(label: str):
+    started = time.perf_counter()
+    try:
+        with st.spinner(label):
+            yield
+    finally:
+        if _STARTUP_PROFILE:
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            print(f"[startup] {label}: {elapsed_ms:.1f} ms", flush=True)
+
+
+_startup_mark("imports")
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 def stream_production_rag(
     query: str, conversation_id: str = "", trace: TraceContext | None = None
@@ -38,27 +88,21 @@ def stream_production_rag(
     yield from client.stream_chat(query, conversation_id=conversation_id)
 
 
-from src.feedback import FeedbackStore
-from src.intent_router import Intent, route_question
-from src.monitoring import record_event
-from src.observability import OBSERVABILITY, TraceContext
-from src.reasoning import route_steps
-from src.toxicity import safe_response
-from src.security import UserRole, evaluate_input
-from src.privacy_ui import upload_privacy_notice
-from src.session_store import SessionStore
-from src.sql_tools import SQLToolError, SkillGraphDatabase
-from src.ml_assistant import LocalMLAssistant, MLAssistantError
-from src.ml_pipeline import ARTIFACT_NAME, global_explanation
-from src.progress_ui import ResumeProgress
-from src.error_ui import render_error_panel
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-load_dotenv(PROJECT_ROOT / ".env")
 LOG_PATH = PROJECT_ROOT / "logs" / "skillgraph.jsonl"
 STATE_DIR = PROJECT_ROOT / "state"
-store = SessionStore(STATE_DIR / "skillgraph.sqlite")
-feedback_store = FeedbackStore(STATE_DIR / "feedback.sqlite")
+
+
+def _get_session_store():
+    return cached_session_store(str(STATE_DIR / "skillgraph.sqlite"))
+
+
+def _get_feedback_store():
+    return cached_feedback_store(str(STATE_DIR / "feedback.sqlite"))
+
+
+store = _get_session_store()
+feedback_store = _get_feedback_store()
+_startup_mark("persistent stores")
 
 
 def _sources_from_event(event: object) -> list[dict[str, str]]:
@@ -318,8 +362,84 @@ def _render_resume_profile(profile: dict[str, Any] | None) -> None:
             st.caption("Nenhuma informação adicional foi sinalizada.")
 
 
-def _render_ml_page() -> None:
+def _render_ml_explainability(
+    artifact_path: Path,
+    artifact: dict[str, Any] | None,
+    payload: dict[str, Any] | None,
+) -> None:
+    """Render XAI only after an explicit user action."""
+    if role != UserRole.DESENVOLVEDOR.value or not payload or not payload.get("profile"):
+        return
+    show_explainability = st.button(
+        "Carregar explicabilidade técnica",
+        key=f"load-xai-{payload.get('trace_id', 'latest')}",
+    )
+    if not show_explainability:
+        st.caption("A explicabilidade técnica será carregada somente quando solicitada.")
+        return
+    with st.spinner("Carregando explicabilidade técnica..."):
+        from src.xai_diagnostics import model_diagnostics
+        from src.ml_inference import global_explanation
 
+        structured = payload.get("structured") or {}
+        diagnostics = model_diagnostics(artifact_path, artifact=artifact)
+        with st.expander("Explicabilidade técnica", expanded=True):
+            st.subheader("Qualidade da entrada")
+            quality = structured.get("input_quality", {})
+            st.json(
+                {
+                    "competências reconhecidas": quality.get(
+                        "recognized_count", len(structured.get("recognized_skills", []))
+                    ),
+                    "competências não reconhecidas": quality.get(
+                        "unrecognized_count", len(structured.get("unrecognized_skills", []))
+                    ),
+                    "cobertura": quality.get("coverage", None),
+                    "desconhecidas afetam o modelo": False,
+                }
+            )
+            st.subheader("Métricas do modelo")
+            st.caption(diagnostics["generalization_message"])
+            st.dataframe(
+                pd.DataFrame(diagnostics["validation"]),
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.dataframe(
+                pd.DataFrame(diagnostics["test"]),
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.subheader("Explicabilidade")
+            st.caption(diagnostics["global_xai_message"])
+            st.caption(diagnostics["association_message"])
+            st.caption(diagnostics["fairness_message"])
+            st.json(
+                {
+                    "incerteza": structured.get("uncertainty", {}),
+                    "explicações locais": structured.get("local_explanations", []),
+                    "prioridades": payload.get("priorities"),
+                }
+            )
+            try:
+                global_rows = global_explanation(artifact_path, artifact=artifact)
+                if global_rows:
+                    st.dataframe(
+                        pd.DataFrame(global_rows),
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+                else:
+                    st.info(
+                        "O modelo atual não fornece importâncias globais positivas para exibição."
+                    )
+            except Exception as exc:
+                st.info("Explicação global indisponível para este artefato.")
+                st.caption(str(exc)[:240])
+
+
+def _render_ml_page() -> None:
+    from src.ml_assistant import LocalMLAssistant
     st.header("Desenvolvimento de competências com Machine Learning")
     st.caption(
         "Recomendação de trilhas para colaboradores informados por analistas e gestores de RH."
@@ -327,17 +447,32 @@ def _render_ml_page() -> None:
     st.info(
         "Contexto: classificação multiclasse de trilhas tech. O sistema estima quais trilhas são mais compatíveis com as competências de um colaborador e aponta prioridades de desenvolvimento."
     )
+    from src.ml_inference import ARTIFACT_NAME
+
     artifact_path = PROJECT_ROOT / ".ml_artifacts" / ARTIFACT_NAME
     if not artifact_path.exists():
         st.warning(
             "O modelo de competências ainda não foi preparado. Solicite ao administrador a execução do pipeline da Etapa 2."
         )
         return
+    try:
+        with _loading("Carregando modelo de competências..."):
+            artifact = _cached_artifact(artifact_path)
+    except (FileNotFoundError, ValueError, OSError, KeyError) as exc:
+        st.error("O modelo de competências não pôde ser carregado nesta sessão.")
+        if _STARTUP_PROFILE:
+            st.caption(str(exc)[:240])
+        return
+    _render_ml_explainability(
+        artifact_path,
+        artifact,
+        st.session_state.get("ml_explainability_payload"),
+    )
     st.subheader("Recomende uma trilha para um colaborador")
     st.caption(
         "Descreva o colaborador sem nome, CPF, e-mail ou outros identificadores. Ex.: colaborador da equipe de dados."
     )
-    assistant = LocalMLAssistant(artifact_path)
+    assistant = LocalMLAssistant(artifact_path, artifact=artifact)
     for message in st.session_state.get("ml_messages", []):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -352,10 +487,28 @@ def _render_ml_page() -> None:
         with st.chat_message("user"):
             st.markdown(ml_question)
         with st.chat_message("assistant"):
+            ml_trace = TraceContext(
+                route="ml_prediction", role=role, user_key=str(uuid.uuid4())
+            )
+            ml_trace.__enter__()
             try:
                 _render_public_reasoning("ml_prediction")
                 result = assistant.predict_from_question(ml_question)
-                st.markdown(result.answer)
+                final_answer, _ = synthesize_response(
+                    "ml_prediction",
+                    result.answer,
+                    structured_context={
+                        "profile": result.profile,
+                        "recommendations": result.recommendations,
+                        "priorities": result.priorities,
+                        "structured": result.structured,
+                    },
+                    trace=ml_trace,
+                )
+                final_answer = validate_user_output(final_answer, route="ml_prediction")
+                st.markdown(final_answer)
+                ml_trace.finish("success")
+                OBSERVABILITY.record(ml_trace)
                 if result.recommendations:
                     st.dataframe(
                         pd.DataFrame(result.recommendations),
@@ -363,77 +516,34 @@ def _render_ml_page() -> None:
                         use_container_width=True,
                     )
                 if role == UserRole.DESENVOLVEDOR.value and result.profile:
-                    with st.expander("Explicabilidade técnica", expanded=False):
-                        from src.xai_diagnostics import model_diagnostics
-
-                        structured = result.structured or {}
-                        diagnostics = model_diagnostics(artifact_path)
-                        st.subheader("Qualidade da entrada")
-                        quality = structured.get("input_quality", {})
-                        st.json(
-                            {
-                                "competências reconhecidas": quality.get(
-                                    "recognized_count",
-                                    len(structured.get("recognized_skills", [])),
-                                ),
-                                "competências não reconhecidas": quality.get(
-                                    "unrecognized_count",
-                                    len(structured.get("unrecognized_skills", [])),
-                                ),
-                                "cobertura": quality.get("coverage", None),
-                                "desconhecidas afetam o modelo": False,
-                            }
-                        )
-                        st.subheader("Métricas do modelo")
-                        st.caption(diagnostics["generalization_message"])
-                        st.dataframe(
-                            pd.DataFrame(diagnostics["validation"]),
-                            hide_index=True,
-                            use_container_width=True,
-                        )
-                        st.dataframe(
-                            pd.DataFrame(diagnostics["test"]),
-                            hide_index=True,
-                            use_container_width=True,
-                        )
-                        st.subheader("Explicabilidade")
-                        st.caption(diagnostics["global_xai_message"])
-                        st.caption(diagnostics["association_message"])
-                        st.caption(diagnostics["fairness_message"])
-                        st.json(
-                            {
-                                "incerteza": structured.get("uncertainty", {}),
-                                "explicações locais": structured.get(
-                                    "local_explanations", []
-                                ),
-                                "prioridades": result.priorities,
-                            }
-                        )
-                        try:
-                            global_rows = global_explanation(artifact_path)
-                            if global_rows:
-                                st.dataframe(
-                                    pd.DataFrame(global_rows),
-                                    hide_index=True,
-                                    use_container_width=True,
-                                )
-                            else:
-                                st.info(
-                                    "O modelo atual não fornece importâncias globais positivas para exibição."
-                                )
-                        except Exception as exc:
-                            st.info(
-                                "Explicação global indisponível para este artefato."
-                            )
-                            st.caption(str(exc)[:240])
+                    st.session_state["ml_explainability_payload"] = {
+                        "trace_id": ml_trace.trace_id,
+                        "profile": result.profile,
+                        "structured": result.structured,
+                        "priorities": result.priorities,
+                    }
+                    _render_ml_explainability(
+                        artifact_path,
+                        artifact,
+                        st.session_state["ml_explainability_payload"],
+                    )
                 st.session_state["ml_messages"].append(
-                    {"role": "assistant", "content": result.answer}
+                    {"role": "assistant", "content": final_answer}
                 )
-            except MLAssistantError as exc:
-                st.error(str(exc))
+            except (MLAssistantError, GeminiSynthesisError) as exc:
+                ml_trace.finish("error", str(exc))
+                OBSERVABILITY.record(ml_trace)
+                st.error(
+                    "Não foi possível gerar a resposta final. "
+                    "Verifique a configuração do Gemini e tente novamente."
+                )
                 st.session_state["ml_messages"].append(
-                    {"role": "assistant", "content": str(exc)}
+                    {"role": "assistant", "content": "A resposta final não foi gerada."}
                 )
+            except Exception as exc:
+                ml_trace.finish("error", str(exc))
+                OBSERVABILITY.record(ml_trace)
+                raise
 
 
 def _render_manager_chart(
@@ -557,7 +667,6 @@ def _select_suggested_prompt(prompt: str) -> None:
 def _render_sidebar(
     database: SkillGraphDatabase | None, db_error: str | None, role: str
 ) -> None:
-    technical = role == UserRole.DESENVOLVEDOR.value
     with st.sidebar:
         st.subheader("Sobre o protótipo")
         st.write(
@@ -640,10 +749,15 @@ st.title("SkillGraph")
 st.caption("Assistente de competências e aprendizagem corporativa — NexaTech")
 DATA_DIR = PROJECT_ROOT / "data_bd"
 try:
-    database = SkillGraphDatabase(DATA_DIR)
+    with _loading("Carregando dados estruturados..."):
+        database = cached_database(str(DATA_DIR), resource_signature(DATA_DIR))
     db_error = None
+    _startup_mark("DuckDB")
 except SQLToolError as exc:
     database, db_error = None, str(exc)
+    _startup_mark("DuckDB error")
+
+_startup_mark("resources")
 
 with st.sidebar:
     role = st.selectbox(
@@ -952,20 +1066,22 @@ else:
         "Comece uma conversa sobre políticas, cargos, competências ou trilhas de desenvolvimento."
     )
 
-if st.session_state.get("pending_resume_text"):
+pending_resume = st.session_state.get("pending_resume")
+if pending_resume:
+    method = "OCR local" if pending_resume.get("used_ocr") else "texto nativo do PDF"
     st.info(
-        f"Currículo recebido: {st.session_state.get('pending_resume_name', 'PDF')}. "
+        f"Currículo recebido: {pending_resume.get('filename', 'PDF')} · "
+        f"{pending_resume.get('pages_processed', 0)} página(s) · {method}. "
         "Clique em **Enviar análise** para iniciar o processamento.\n\n"
-        "**A análise de currículo demora um pouco mais e pode levar até 5 minutos devido ao fluxo de OCR, JEV e agentes especializados.**"
+        "**A análise pode levar alguns minutos devido ao JEV e aos agentes especializados.**"
     )
     if st.button("Enviar análise", key="send-resume-analysis", type="primary"):
-        question = st.session_state.pop(
+        question = st.session_state.get(
             "pending_resume_question",
             "Analise este currículo para desenvolvimento profissional.",
         )
         conversation_id = _ensure_resume_conversation(question, role)
-        resume_text = st.session_state.pop("pending_resume_text")
-        st.session_state.pop("pending_resume_name", None)
+        resume_text = str(pending_resume.get("text", ""))
         request_id = str(uuid.uuid4())
         trace = TraceContext(route="resume_analysis", role=role, user_key=request_id)
         trace.__enter__()
@@ -974,19 +1090,19 @@ if st.session_state.get("pending_resume_text"):
             progress.update(
                 "ocr",
                 "Texto do currículo extraído",
-                "A extração local/OCR foi concluída.",
+                f"Extração concluída por {method}; {pending_resume.get('pages_processed', 0)} página(s) processada(s).",
             )
-            with trace.span("document.extract", "ocr", task_name="pdf_text_extraction"):
-                pass
             progress.update(
                 "jev",
                 "Consultando análise estruturada",
-                "Os sinais estruturados estão sendo processados.",
+                "O texto será sanitizado antes da chamada ao JEV.",
             )
             with trace.span("crewai.resume", "crewai", task_name="resume_analysis"):
                 agent_result = run_agent_turn(
                     question, resume_text=resume_text, has_resume=True, trace=trace
                 )
+            if agent_result.get("status") != "completed":
+                raise RuntimeError(agent_result.get("answer", "O fluxo de currículo não foi concluído."))
             progress.update(
                 "agents",
                 "Agentes especializados concluídos",
@@ -1027,10 +1143,13 @@ if st.session_state.get("pending_resume_text"):
                     }
                 )
             st.chat_message("user").markdown(question)
+            answer = validate_user_output(answer, route="resume_analysis")
             st.chat_message("assistant").markdown(answer)
             progress.finish(True)
             trace.finish("success")
             OBSERVABILITY.record(trace)
+            st.session_state.pop("pending_resume", None)
+            st.session_state.pop("pending_resume_question", None)
         except Exception as exc:
             progress.finish(False, "Verifique a configuração local ou tente novamente.")
             trace.finish("error", str(exc))
@@ -1045,6 +1164,7 @@ if st.session_state.get("pending_resume_text"):
         st.stop()
 
 st.info(upload_privacy_notice())
+
 pending_prompt = st.session_state.pop("pending_prompt", "")
 if pending_prompt:
     st.info(f"Sugestão selecionada: **{pending_prompt}**. Pressione Enter para enviar.")
@@ -1063,51 +1183,34 @@ if question or uploaded_files:
     if len(uploaded_files) > 1:
         st.error("Envie apenas um currículo PDF por análise.")
         st.stop()
-    resume_text = None
     if uploaded_files:
+        extraction_trace = TraceContext(
+            route="resume_analysis", role=role, user_key=str(uuid.uuid4())
+        )
         try:
-            import tempfile
-
             uploaded = uploaded_files[0]
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as temporary:
-                temporary.write(uploaded.getvalue())
-                temporary.flush()
-                resume_text = extract_pdf_text(Path(temporary.name)).text
-            question = (
+            with extraction_trace:
+                extracted = extract_uploaded_resume(uploaded)
+            st.session_state["pending_resume"] = {
+                "filename": extracted.filename,
+                "text": extracted.text,
+                "used_ocr": extracted.used_ocr,
+                "pages_processed": extracted.pages_processed,
+                "extraction_method": extracted.extraction_method,
+            }
+            st.session_state["pending_resume_question"] = (
                 question or "Analise este currículo para desenvolvimento profissional."
             )
-            st.session_state["pending_resume_text"] = resume_text
-            st.session_state["pending_resume_question"] = question
-            st.session_state["pending_resume_name"] = uploaded.name
             st.rerun()
         except ResumeExtractionError as exc:
             st.error(str(exc))
             st.stop()
     if not question:
         st.stop()
+
     request_id = str(uuid.uuid4())
     trace = TraceContext(route="pending", role=role, user_key=request_id)
     trace.__enter__()
-    if resume_text:
-        with trace.span("document.extract", "ocr", task_name="pdf_text_extraction"):
-            pass
-        with trace.span("crewai.resume", "crewai", task_name="resume_analysis"):
-            agent_result = run_agent_flow(
-                question,
-                resume_text=resume_text,
-                has_resume=True,
-                trace=trace,
-            )
-            if agent_result.get("status") == "completed":
-                st.info(agent_result.get("answer", "Análise multiagente concluída."))
-            else:
-                st.warning(
-                    agent_result.get("answer", "O fluxo multiagente está desativado.")
-                )
-        trace.route = "resume_analysis"
-        trace.finish("success")
-        OBSERVABILITY.record(trace)
-        st.stop()
     started = time.perf_counter()
     decision = evaluate_input(question, UserRole(role))
     if not decision.allowed:
@@ -1165,6 +1268,7 @@ if question or uploaded_files:
         progress.info("Analisando sua pergunta…")
         answer, sources, tools, table_rows, chart_frame = "", [], [], None, None
         agent_handled = False
+        answer_already_synthesized = False
         try:
             if use_agent_runtime:
                 progress.info("Executando o fluxo multiagente…")
@@ -1195,6 +1299,7 @@ if question or uploaded_files:
                         role=role,
                     )
                     agent_handled = True
+                    answer_already_synthesized = True
                 elif agent_status in {"disabled", "error"}:
                     use_agent_runtime = False
                     trace.route = route.intent.value
@@ -1302,6 +1407,29 @@ if question or uploaded_files:
 
         if not use_agent_runtime:
             reasoning_steps = route_steps(route.intent.value)
+        if route.intent not in {Intent.SMALLTALK} and not answer_already_synthesized:
+            try:
+                answer, synthesis_metadata = synthesize_response(
+                    route.intent.value,
+                    answer,
+                    structured_context={
+                        "question": question,
+                        "route": route.intent.value,
+                        "tools": tools,
+                    },
+                    sources=sources,
+                    table_rows=table_rows,
+                    trace=trace,
+                )
+            except GeminiSynthesisError as exc:
+                progress.empty()
+                st.error(
+                    "Não foi possível gerar a resposta final pelo Gemini. "
+                    "Verifique a configuração da API e tente novamente."
+                )
+                trace.finish("error", str(exc))
+                OBSERVABILITY.record(trace)
+                st.stop()
         _render_public_reasoning(
             agent_route.value if use_agent_runtime else route.intent.value,
             reasoning_steps,

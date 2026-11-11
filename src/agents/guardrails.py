@@ -18,6 +18,8 @@ _INJECTION = re.compile(
     re.I,
 )
 _DECISION = re.compile(r"contrat(e|ar)|demit|deslig|promov|salário|remunera", re.I)
+_SECRET = re.compile(r"(?i)bearer\s+\S+|sk-[A-Za-z0-9_-]{12,}|AIza[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{12,}|api[_ -]?key\s*[:=]\s*\S+|password\s*[:=]\s*\S+")
+_OUTPUT_INJECTION = re.compile(r"(?i)ignore (?:all|your|the) (?:previous )?(?:rules|instructions)|system prompt|developer message|chain[- ]of[- ]thought")
 
 
 def validate_agent_input(text: str, *, max_chars: int = 4000) -> None:
@@ -35,7 +37,7 @@ def validate_agent_output(value: Any) -> Any:
     if value is None:
         raise AgentGuardrailError("O agente não retornou resultado.")
     text = str(value)
-    if _PII.search(text) or _DECISION.search(text):
+    if _PII.search(text) or _DECISION.search(text) or _SECRET.search(text) or _OUTPUT_INJECTION.search(text):
         raise AgentGuardrailError(
             "A resposta contém conteúdo fora do escopo permitido."
         )

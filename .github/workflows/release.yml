@@ -30,7 +30,14 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: |
+            requirements.txt
+            requirements-base.txt
+            requirements-ml.txt
+            requirements-crewai.txt
+            requirements-evals.txt
+            requirements-dev.txt
+            .github/workflows/release.yml
 
       - name: Validate tag and version
         run: |

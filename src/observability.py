@@ -204,7 +204,6 @@ class ObservabilityStore:
         self._langfuse_error = None
         self._langfuse_send_count = 0
         self._langfuse_last_trace_id = None
-        self._initialize_langfuse()
 
     @staticmethod
     def _load_local_traces() -> list[dict[str, Any]]:
@@ -224,15 +223,15 @@ class ObservabilityStore:
         return traces[-500:]
 
     def _initialize_langfuse(self) -> None:
-        self._langfuse = None
-        self._langfuse_error = None
-        if _enabled():
-            try:
-                from langfuse import Langfuse
+        """Initialize the optional SDK only when telemetry is sent."""
+        if self._langfuse is not None or self._langfuse_error is not None or not _enabled():
+            return
+        try:
+            from langfuse import Langfuse
 
-                self._langfuse = Langfuse(**_langfuse_options())
-            except Exception as exc:
-                self._langfuse_error = self._safe_langfuse_error(exc)
+            self._langfuse = Langfuse(**_langfuse_options())
+        except Exception as exc:
+            self._langfuse_error = self._safe_langfuse_error(exc)
 
     def refresh(self) -> None:
         """Reload local trace history after a Streamlit rerun."""
@@ -266,6 +265,7 @@ class ObservabilityStore:
         self.traces = (self.traces + [summary])[-500:]
         _write_local_trace(summary)
         self._check_alerts(summary)
+        self._initialize_langfuse()
         if self._langfuse:
             self._send_langfuse(trace)
         return summary
@@ -321,13 +321,44 @@ class ObservabilityStore:
             for span in trace.spans:
                 if span.name == "trace":
                     continue
+                metadata = {
+                    "service": span.service,
+                    "task_name": span.task_name,
+                    "status": span.status,
+                }
+                metadata.update(
+                    {
+                        key: value
+                        for key, value in span.metadata.items()
+                        if key in {"observation_type", "usage_source", "cost_source", "model"}
+                    }
+                )
+                usage = {
+                    "input": int(span.input_tokens),
+                    "output": int(span.output_tokens),
+                    "total": int(span.input_tokens + span.output_tokens),
+                }
+                costs = {"total": round(float(span.cost), 8)} if span.cost else None
+                if span.metadata.get("observation_type") == "generation" and hasattr(
+                    root, "start_generation"
+                ):
+                    child = root.start_generation(
+                        name=span.name,
+                        input={"trace_id": trace.trace_id},
+                        output={
+                            "duration_ms": round(span.duration_ms, 2),
+                            "status": span.status,
+                        },
+                        metadata=metadata,
+                        model=span.metadata.get("model"),
+                        usage_details=usage,
+                        cost_details=costs,
+                    )
+                    child.end()
+                    continue
                 child = root.start_span(
                     name=span.name,
-                    metadata={
-                        "service": span.service,
-                        "task_name": span.task_name,
-                        "status": span.status,
-                    },
+                    metadata=metadata,
                     input={"trace_id": trace.trace_id},
                 )
                 child.update(
@@ -429,16 +460,24 @@ class ObservabilityStore:
         def pct(q):
             return round(statistics.quantiles(vals, n=100, method="inclusive")[max(0, int(q * 100) - 1)], 2) if len(vals) > 1 else (round(vals[0], 2) if vals else 0.0)
 
+        trace_count = len(ts)
+        total_tokens = sum(
+            t.get("input_tokens", 0) + t.get("output_tokens", 0) for t in ts
+        )
+        total_cost = sum(t.get("cost", 0) for t in ts)
         return {
-            "traces": len(ts),
+            "traces": trace_count,
             "latency_p50_ms": pct(0.5),
             "latency_p95_ms": pct(0.95),
             "latency_p99_ms": pct(0.99),
-            "error_rate": round(sum(t.get("status") == "error" for t in ts) / len(ts), 4) if ts else 0.0,
-            "timeout_rate": round(sum(t.get("status") == "timeout" for t in ts) / len(ts), 4) if ts else 0.0,
+            "error_rate": round(sum(t.get("status") == "error" for t in ts) / trace_count, 4) if ts else 0.0,
+            "timeout_rate": round(sum(t.get("status") == "timeout" for t in ts) / trace_count, 4) if ts else 0.0,
             "input_tokens": sum(t.get("input_tokens", 0) for t in ts),
             "output_tokens": sum(t.get("output_tokens", 0) for t in ts),
-            "cost": round(sum(t.get("cost", 0) for t in ts), 8),
+            "total_tokens": total_tokens,
+            "average_tokens": round(total_tokens / trace_count, 2) if ts else 0.0,
+            "cost": round(total_cost, 8),
+            "average_cost": round(total_cost / trace_count, 8) if ts else 0.0,
             "recent_traces": list(reversed(ts[-10:])),
         }
 

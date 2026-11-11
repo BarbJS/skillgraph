@@ -9,7 +9,7 @@ pytest -q tests/test_golden_dataset.py tests/test_intent_router.py tests/test_se
 ```
 
 
-O arquivo `golden_dataset.jsonl` contém 18 casos versionados para avaliar as rotas do SkillGraph antes da demonstração.
+O arquivo `golden_dataset.jsonl` contém 25 casos versionados para avaliar as rotas do SkillGraph antes da demonstração. `agent_goldens.jsonl` acrescenta quatro cenários compostos de agentes; `rag_goldens.jsonl` contém doze casos com resposta, contexto e ground truth para a avaliação semântica opcional com DeepEval.
 
 ## Categorias
 
@@ -43,10 +43,10 @@ pytest -q tests/test_golden_dataset.py
 Execução das camadas locais SQL, RAG e segurança:
 
 ```bash
-python -m src.evaluation
+make evaluate-ai
 ```
 
-O RAG do Dify continua sendo validado com o serviço local publicado e não é chamado automaticamente pela suíte unitária. Para cada pergunta RAG, registre manualmente a resposta, fontes e latência no relatório da demonstração.
+O RAG do Dify continua sendo validado com o serviço local publicado e não é chamado automaticamente pela suíte unitária. Para cada pergunta RAG, registre manualmente a resposta, fontes e latência no relatório da demonstração. A avaliação live com DeepEval é opcional e pode consumir chamadas do modelo judge; execute-a manualmente com `scripts/evaluate-ai-live.py --deepeval --yes-live --dataset evals/rag_goldens.jsonl`.
 
 ## Critérios
 

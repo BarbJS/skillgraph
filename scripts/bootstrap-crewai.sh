@@ -25,6 +25,6 @@ else
 fi
 
 "${VENV_DIR}/bin/python" -m pip install --upgrade pip
-"${VENV_DIR}/bin/python" -m pip install -r "${ROOT}/requirements.txt"
+"${VENV_DIR}/bin/python" -m pip install -r "${ROOT}/requirements-dev.txt"
 "${VENV_DIR}/bin/python" -m pip check
 printf '[INFO] Ambiente oficial pronto: %s (%s)\n' "${VENV_DIR}" "$(${VENV_DIR}/bin/python --version)"

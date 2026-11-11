@@ -1,0 +1,42 @@
+from src.gemini_synthesizer import GeminiSynthesizer
+
+
+class Response:
+    def __init__(self, status_code, body):
+        self.status_code = status_code
+        self.body = body
+
+    def json(self):
+        return self.body
+
+
+class Session:
+    def __init__(self):
+        self.models = []
+
+    def post(self, url, **kwargs):
+        model = url.split("/models/")[1].split(":")[0]
+        self.models.append(model)
+        if len(self.models) == 1:
+            return Response(404, {"error": {"message": "model unavailable"}})
+        return Response(
+            200,
+            {
+                "candidates": [{"content": {"parts": [{"text": "ok"}]}}],
+                "usageMetadata": {
+                    "promptTokenCount": 2,
+                    "candidatesTokenCount": 1,
+                    "totalTokenCount": 3,
+                },
+            },
+        )
+
+
+def test_gemini_uses_configured_fallback_model_after_404(monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODEL", "gemini-fallback")
+    session = Session()
+    result = GeminiSynthesizer(
+        enabled=True, api_key="key", model="gemini-primary", session=session
+    ).synthesize({"draft_answer": "safe"})
+    assert result.text == "ok"
+    assert session.models == ["gemini-primary", "gemini-fallback"]

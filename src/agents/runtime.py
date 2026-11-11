@@ -19,9 +19,10 @@ from src.agents.tools import (
 )
 from src.dify_client import DifyClient
 from src.jev_client import JevClient
-from src.sql_tools import SkillGraphDatabase
 from src.privacy import redact_text, sanitize
-from src.reasoning import agent_execution_steps, core_decision_step, sanitize_steps, task_step
+from src.response_synthesis import synthesize_response
+from src.sql_tools import SkillGraphDatabase
+from src.reasoning import agent_execution_steps, sanitize_steps
 from src.resume_profile import extract_profile, render_profile
 
 
@@ -76,11 +77,11 @@ def run_agent_turn(
             "answer": "Descreva um colaborador, uma competência, uma trilha, um treinamento ou uma política que deseja consultar.",
             "state_patch": {},
         }
-    if os.getenv("CREWAI_ENABLED", "true").casefold() != "true":
+    if os.getenv("CREWAI_ENABLED", "false").casefold() != "true":
         return {
-            "status": "error",
+            "status": "disabled",
             "route": route.value,
-            "answer": "O CrewAI é obrigatório para este fluxo. Configure CREWAI_ENABLED=true e reinicie a aplicação.",
+            "answer": "O fluxo multiagente está preparado, mas desativado neste ambiente.",
             "state_patch": {"last_route": route.value},
         }
     try:
@@ -213,14 +214,32 @@ def run_agent_turn(
             core_decision=core_output,
         )
         reasoning_steps = sanitize_steps(reasoning_steps)
+        local_answer = str(result)
+        final_answer, synthesis = synthesize_response(
+            route.value,
+            local_answer,
+            structured_context={
+                "profile_rendered": render_profile(resume_profile)
+                if resume_profile
+                else "",
+                "profile": resume_profile.model_dump(mode="json")
+                if resume_profile
+                else None,
+                "state": sanitize(state),
+            },
+            trace=trace,
+        )
+        synthesis["fallback"] = False
+        synthesis["provider"] = "gemini"
         return {
             "status": "completed",
             "route": route.value,
-            "answer": str(result),
+            "answer": final_answer,
             "profile": (
                 resume_profile.model_dump(mode="json") if resume_profile else None
             ),
             "reasoning": sanitize_steps(reasoning_steps),
+            "synthesis": {key: value for key, value in synthesis.items() if key != "error"},
             "state_patch": {"last_route": route.value},
         }
     except CrewAIUnavailable as exc:

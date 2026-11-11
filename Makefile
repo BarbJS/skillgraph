@@ -1,7 +1,16 @@
-.PHONY: check test package-etapa1 audit-delivery bootstrap up down status smoke bootstrap-flaml train-ml bootstrap-crewai run run-crewai evaluate-ai evaluate-ai-live pytest install-dev lint ci release-check
+.PHONY: check test package-etapa1 audit-delivery bootstrap up down status smoke bootstrap-flaml train-ml bootstrap-crewai run run-crewai evaluate-ai evaluate-ai-live pytest install-dev install-prod install-ml install-evals lint ci release-check benchmark-performance
 
 DEV_PYTHON := .venv/bin/python
 DEV_PRE_COMMIT := .venv/bin/pre-commit
+
+install-prod:
+	$(DEV_PYTHON) -m pip install -r requirements.txt
+
+install-ml: install-prod
+	$(DEV_PYTHON) -m pip install -r requirements-ml.txt
+
+install-evals: install-prod
+	$(DEV_PYTHON) -m pip install -r requirements-evals.txt
 
 install-dev: bootstrap-crewai
 	$(DEV_PYTHON) -m pip install -r requirements-dev.txt

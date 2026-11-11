@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.ml_pipeline import (
+from src.ml_pipeline import (  # noqa: E402
     ARTIFACT_NAME,
     SEED,
     build_track_profiles,

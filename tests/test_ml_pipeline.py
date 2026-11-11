@@ -8,6 +8,41 @@ from src.ml_pipeline import (
 )
 
 
+def test_training_module_does_not_import_flaml_eagerly():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import src.ml_pipeline; print('flaml' in sys.modules)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "False"
+
+
+def test_inference_module_does_not_import_training_optimizer():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; import src.ml_inference; print('flaml' in sys.modules)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "False"
+
+
+
 def test_split_is_deterministic_and_has_requested_proportions():
     frame = pd.DataFrame(
         {
@@ -74,3 +109,17 @@ def test_onet_fixture_builds_explicit_track_target(tmp_path):
     frame, metadata = build_training_frame(root)
     assert "track" in frame
     assert metadata["occupation_count"] == 3
+
+
+def test_resource_signature_changes_with_version_and_file_metadata(tmp_path):
+    from src.streamlit_resources import resource_signature
+
+    target = tmp_path / "artifact.bin"
+    target.write_bytes(b"one")
+    first = resource_signature(target, version="v1")
+    same_file_new_version = resource_signature(target, version="v2")
+    target.write_bytes(b"two")
+    changed_file = resource_signature(target, version="v2")
+
+    assert first != same_file_new_version
+    assert same_file_new_version != changed_file

@@ -16,7 +16,7 @@ copy_if_exists() {
   cp -R "${ROOT}/${path}" "${STAGE}/${path}"
 }
 
-for path in README.md Makefile pytest.ini requirements.txt env.example .gitignore app.py src documents_rag data_bd docs evals tests scripts; do
+for path in README.md Makefile pytest.ini requirements.txt requirements-base.txt requirements-ml.txt requirements-crewai.txt requirements-evals.txt requirements-dev.txt env.example .gitignore app.py src documents_rag data_bd docs evals tests scripts; do
   copy_if_exists "${path}"
 done
 

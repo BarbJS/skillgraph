@@ -11,7 +11,6 @@ from typing import Any
 
 from src.dify_client import DifyClient
 from src.jev_client import JevClient
-from src.ml_pipeline import recommend_from_profile
 from src.sql_tools import SkillGraphDatabase
 
 
@@ -22,6 +21,8 @@ class AgentToolError(RuntimeError):
 def competency_recommendation_tool(
     artifact_path: Path, skills: dict[str, float]
 ) -> dict[str, Any]:
+    from src.ml_inference import recommend_from_profile
+
     return recommend_from_profile(artifact_path, skills)
 
 

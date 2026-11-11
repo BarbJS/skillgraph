@@ -36,7 +36,19 @@ A avaliação possui três níveis:
 
 Testes de integração usam mocks e não consomem créditos de JEV, Langfuse ou Slack.
 
+## Decisão sobre LLM Guard e segurança
+
+O LLM Guard foi avaliado como camada complementar para prompt injection, jailbreak, PII, secrets e toxicidade. A tentativa de integração no ambiente principal revelou conflitos de dependências com CrewAI, DeepEval e o stack de ML, incluindo pins incompatíveis de `json-repair`, `click`, `numpy`, `regex` e componentes de spaCy. Para preservar a reprodutibilidade e não quebrar o runtime, o LLM Guard foi removido do ambiente, do código e dos requisitos do projeto.
+
+Como alternativa, os guardrails determinísticos foram fortalecidos com uma camada central de validação de saída, detecção ampliada de PII/secrets, bloqueios de prompt injection/jailbreak/SQL e testes sintéticos de toxicidade e segurança no Golden Dataset. O DeepEval continua separado, sendo usado para qualidade semântica e não como filtro de segurança online.
+
+## Execuções live manuais
+
+Os comandos `scripts/evaluate-ai-live.py`, `scripts/test-jev.py`, `scripts/validate-langfuse-connection.py` e `scripts/validate-observability.py` são diagnósticos/avaliações live. Eles podem consumir chamadas externas, enviar traces ou acionar alertas; por isso, não são executados pela CI nem pela suíte padrão. Execute-os somente com as credenciais e confirmações apropriadas.
+
 ## 2. Golden Dataset
+
+A execução do Golden Dataset roda os casos contra o backend atual; as perguntas e expectativas permanecem fixas para permitir comparação entre versões do repositório.
 
 `evals/golden_dataset.jsonl` contém 25 casos sintéticos de:
 
