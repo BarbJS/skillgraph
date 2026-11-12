@@ -587,7 +587,7 @@ O CrewAI e os agentes continuam usando o LM Studio local. Se a demonstração pr
 
 ```env
 GEMINI_API_KEY=sua-chave-local
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 Essa etapa recebe apenas o rascunho e os dados estruturados sanitizados; não recebe PDF, bytes, currículo bruto, PII ou resposta bruta do JEV. Toda resposta elaborada deve passar pelo Gemini; se a chave faltar ou a API falhar, a execução é interrompida com diagnóstico, sem apresentar o rascunho local como resposta final. O uso do Gemini aparece no trace como `gemini.final_synthesis`; tokens vêm do `usageMetadata` da API. O custo só é calculado quando as tarifas `GEMINI_INPUT_USD_PER_1M` e `GEMINI_OUTPUT_USD_PER_1M` forem configuradas. O LLM-as-a-judge permanece separado e não é alterado.

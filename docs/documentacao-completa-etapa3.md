@@ -102,21 +102,108 @@ O JEV continua sendo uma etapa backend, não um agente autônomo. Seu resultado 
 
 ### 4.1 Motivo da mudança
 
-O LM Studio local continua adequado para agentes e interpretação local, mas não fornece necessariamente custo de API nem uso confiável de tokens para demonstração. A Etapa 3 introduziu uma chamada Gemini obrigatória como última síntese das respostas elaboradas.
+O LM Studio local continua sendo o provider do ambiente de desenvolvimento, mas não é uma dependência do primeiro deploy público. Ele fornece localmente o modelo conversacional e o modelo de embeddings usados pelo Dify self-hosted. Para a produção no Streamlit Community Cloud, o RAG será recriado no Dify Cloud e o modelo conversacional será o Gemini; a Knowledge Base será reindexada com o modelo de embeddings Gemini disponível no Dify Cloud.
 
-A arquitetura passou a ser:
+A Etapa 3 introduziu uma chamada Gemini obrigatória como última síntese das respostas elaboradas. O mesmo provider Gemini também será validado para o CrewAI, usando o prefixo LiteLLM `gemini/`, sem exigir uma `base_url` local.
+
+#### Ambiente local de desenvolvimento
 
 ```text
-LM Studio/CrewAI/Dify/DuckDB/JEV
+Streamlit local
   ↓
-rascunho ou resultado estruturado
-  ↓
-Gemini final
-  ↓
-output gate
-  ↓
-resposta ao usuário
+Dify self-hosted/Docker local
+  ├── Chatflow local
+  ├── Knowledge Base local
+  ├── LM Studio — modelo de chat
+  └── LM Studio — modelo de embeddings
+        ↓
+DuckDB/SQLite/OCR/CrewAI/JEV
+        ↓
+Gemini final conforme a configuração local
 ```
+
+O desenvolvimento local preserva os endpoints e ferramentas originalmente construídos, incluindo `localhost`, `127.0.0.1`, Docker, LM Studio e volumes locais.
+
+#### Ambiente de produção atual
+
+```text
+Streamlit Community Cloud
+  ├── app.py e código versionado
+  ├── data_bd e documentos públicos do repositório
+  ├── DuckDB read-only
+  ├── CrewAI configurado para Gemini
+  ├── JEV por API HTTPS
+  ├── Langfuse Cloud
+  └── síntese final Gemini
+        ↓
+Dify Cloud
+  ├── Chatflow recriado/publicado
+  ├── Knowledge Base reindexada
+  ├── Gemini 2.5 Flash — conversa
+  └── gemini-embedding-001 — embeddings
+```
+
+A produção não acessa o LM Studio local. A aplicação usa Secrets do Streamlit Cloud para `DIFY_API_*`, `GEMINI_*`, `CREWAI_*`, `JEV_*` e `LANGFUSE_*`. Nenhuma chave é commitada ou enviada ao navegador.
+
+A decisão de trocar somente os providers de produção, e não reescrever as rotas do produto, preserva a fidelidade do comportamento local enquanto torna os endpoints acessíveis pela internet.
+
+#### Decisão sobre a migração do RAG
+
+O Dify local e o Dify Cloud são instâncias diferentes. O Chatflow e os vetores não são tratados como arquivos independentes que possam ser copiados sem validação. A Knowledge Base é recriada no Dify Cloud, os quatro documentos de `documents_rag/` são reenviados e reindexados, e o Chatflow é publicado novamente.
+
+A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial, Top K 3 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 2.5 Flash gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
+
+#### Decisão sobre a API do Dify
+
+O cliente do projeto usa `DIFY_API_BASE_URL` e `DIFY_API_KEY`. Ele aceita a base local e a base cloud com ou sem `/v1`, normalizando o endpoint para `/v1/chat-messages` sem duplicar o caminho. O parser trata eventos Chatflow `message`, `agent_message`, `message_end`, `workflow_finished` e falhas do workflow, porque o Chatflow Cloud pode encerrar o stream sem emitir apenas chunks `message`.
+
+Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente.
+
+#### Decisão sobre o LLM único de produção
+
+A produção usa Gemini como provider conversacional comum para:
+
+- modelo do Chatflow no Dify Cloud;
+- síntese final obrigatória do SkillGraph;
+- CrewAI, quando a execução com function calling for validada.
+
+O ambiente local mantém LM Studio para preservar o desenvolvimento. Essa separação evita expor o computador local e reduz a quantidade de providers conversacionais no deploy.
+
+#### Preparação cloud realizada
+
+A Etapa 3 adicionou:
+
+- `scripts/start-streamlit.sh`, que usa `PORT` e escuta em `0.0.0.0`;
+- `make run-cloud`;
+- `scripts/cloud-smoke-test.py` para `/_stcore/health`;
+- requirements de produção com CrewAI e inferência ML;
+- configuração de `SKILLGRAPH_STATE_DIR` e `OBSERVABILITY_LOG_PATH`;
+- documentação em `docs/cloud-readiness.md`;
+- plano operacional em `docs/plan-streamlit-cloud-gemini.md`.
+
+Essas alterações tornam o processo cloud-ready sem substituir o launcher local nem os serviços do ambiente de desenvolvimento.
+
+#### Secrets e limites do primeiro deploy
+
+Os Secrets ficam somente no Streamlit Cloud. A primeira produção exige `CREWAI_ENABLED=true`, `JEV_ENABLED=true` e `LANGFUSE_ENABLED=true`, além das chaves de Dify e Gemini. `SLACK_ALERTS_ENABLED` pode permanecer falso até que o alerta seja necessário.
+
+O primeiro deploy não promete persistência empresarial: SQLite, logs e caches podem ser perdidos em reinícios do Streamlit Cloud; o artefato ML precisa ser disponibilizado por storage/build; OCR depende da disponibilidade do Tesseract; não há autenticação/RBAC real. Essas limitações são intencionais e ficam registradas nos próximos passos.
+
+#### Critério de aceitação da produção
+
+A produção só é considerada funcional quando validar, pela URL pública:
+
+1. Chatflow Dify Cloud com fontes;
+2. Gemini final;
+3. CrewAI com Gemini;
+4. JEV com currículo sintético sanitizado;
+5. traces no Langfuse;
+6. DuckDB e dados sintéticos;
+7. ML/XAI quando o artefato estiver disponível;
+8. OCR quando o runtime fornecer Tesseract;
+9. Qualidade/Evals conforme as dependências e o judge configurados.
+
+A paridade é avaliada funcionalmente por rota; não significa que o processo local, o provider de embeddings ou o storage temporário sejam idênticos aos da nuvem.
 
 ### 4.2 Cliente Gemini
 

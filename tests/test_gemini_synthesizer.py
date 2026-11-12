@@ -24,6 +24,12 @@ class Session:
         return Response()
 
 
+def test_gemini_defaults_to_current_flash_model(monkeypatch):
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    client = GeminiSynthesizer(enabled=False, api_key="key", session=Session())
+    assert client.model == "gemini-3.8-flash"
+
+
 def test_disabled_gemini_does_not_call_api():
     session = Session()
     client = GeminiSynthesizer(enabled=False, api_key="key", session=session)
