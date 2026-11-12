@@ -149,7 +149,12 @@ def _set_span_usage(span: Any, usage: Mapping[str, Any], *, query: str = "", ans
 
 class DifyClient:
     def __init__(self, base_url: str, api_key: str, user_id: str, *, timeout: tuple[float, float] = (10.0, 180.0), session: requests.Session | None = None, trace: TraceContext | None = None):
-        self.base_url = base_url.rstrip("/")
+        normalized_base_url = base_url.rstrip("/")
+        if normalized_base_url.endswith("/v1"):
+            normalized_base_url = normalized_base_url[:-3].rstrip("/")
+        if normalized_base_url.endswith("/chat-messages"):
+            normalized_base_url = normalized_base_url[: -len("/chat-messages")].rstrip("/")
+        self.base_url = normalized_base_url
         self.api_key = api_key
         self.user_id = user_id
         self.timeout = timeout
@@ -161,6 +166,13 @@ class DifyClient:
         cls, *, trace: TraceContext | None = None
     ) -> "DifyClient":
         base_url = os.getenv("DIFY_API_BASE_URL", "http://localhost").strip()
+        base_url = base_url.rstrip("/")
+        if base_url.endswith("/v1"):
+            base_url = base_url[:-3].rstrip("/")
+        if base_url.endswith("/chat-messages"):
+            base_url = base_url[: -len("/chat-messages")].rstrip("/")
+        if not base_url:
+            raise DifyClientError("DIFY_API_BASE_URL não pode ser vazio.")
         api_key = os.getenv("DIFY_API_KEY", "").strip()
         user_id = os.getenv("DIFY_USER_ID", "skillgraph-local-user").strip()
         if not api_key:
@@ -186,7 +198,7 @@ class DifyClient:
                 if response.status_code in (401, 403):
                     raise DifyClientError("A API do Dify recusou a chave. Verifique DIFY_API_KEY e confirme que ela pertence ao Chatflow local publicado.")
                 if response.status_code == 404:
-                    raise DifyClientError("Endpoint do Chatflow não encontrado. Confirme que o app foi publicado e que DIFY_API_BASE_URL aponta para http://localhost.")
+                    raise DifyClientError("Endpoint do Chatflow não encontrado. Confirme que o Chatflow está publicado e que DIFY_API_BASE_URL aponta para a instância correta do Dify.")
                 if response.status_code >= 400:
                     raise DifyClientError(f"O Dify retornou HTTP {response.status_code}: {_safe_error_detail(response)}")
                 header_usage = _usage_from_response_headers(response)
@@ -200,7 +212,7 @@ class DifyClient:
                         self._last_usage = header_usage
                     yield event
         except requests.RequestException as exc:
-            raise DifyClientError("Não foi possível conectar ao Dify local. Confirme se os containers estão ativos.") from exc
+            raise DifyClientError("Não foi possível conectar à API do Dify. Confirme a URL, a chave e a disponibilidade do Chatflow.") from exc
         except Exception as exc:
             if isinstance(exc, DifyClientError):
                 raise

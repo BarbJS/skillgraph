@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 import pytest
 
 from src.dify_client import DifyClient, DifyClientError
@@ -59,6 +58,28 @@ def test_stream_chat_parses_dify_events_without_logging_key():
     assert session.payload["json"]["response_mode"] == "streaming"
 
 
+def test_cloud_base_url_normalizes_api_path():
+    session = FakeSession(
+        FakeResponse(
+            [
+                "event: message",
+                'data: {"answer":"resposta"}',
+                "",
+                "event: message_end",
+                'data: {"message_id":"m1"}',
+                "",
+            ]
+        )
+    )
+    client = DifyClient(
+        "https://api.dify.ai/v1", "secret-key", "user", session=session
+    )
+
+    list(client.stream_chat("pergunta"))
+
+    assert session.payload["url"] == "https://api.dify.ai/v1/chat-messages"
+
+
 def test_stream_chat_records_provider_usage_on_trace():
     events = [
         "event: message",
@@ -106,7 +127,6 @@ def test_stream_chat_without_usage_keeps_cost_explicitly_unpriced():
     assert summary["output_tokens"] > 0
     assert summary["cost"] == 0.0
     assert trace.spans[0].metadata["usage_source"] == "local_estimate"
-
 
 
 def test_empty_question_is_rejected():
