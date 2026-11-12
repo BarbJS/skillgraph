@@ -51,7 +51,7 @@ class GeminiSynthesizer:
     ) -> None:
         self.enabled = True if enabled is None else enabled
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
         raw_timeout = timeout if timeout is not None else os.getenv("GEMINI_TIMEOUT_SECONDS", "60")
         try:
             self.timeout = float(raw_timeout)
@@ -136,7 +136,7 @@ class GeminiSynthesizer:
         model_candidates = [self.model]
         fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-flash-lite-latest").strip()
         if self.model == "gemini-2.5-flash":
-            model_candidates = ["gemini-flash-lite-latest"]
+            model_candidates = ["gemini-3.8-flash"]
         if fallback_model and fallback_model not in model_candidates:
             model_candidates.append(fallback_model)
         response = None
