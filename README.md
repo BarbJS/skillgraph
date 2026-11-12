@@ -483,6 +483,14 @@ Os perfis de dependência são separados para reduzir o tamanho do runtime:
 - `requirements-evals.txt`: DeepEval;
 - `requirements-dev.txt`: todos os grupos e ferramentas de desenvolvimento.
 
+Para executar o app em uma plataforma cloud que injeta `PORT`:
+
+```bash
+make run-cloud
+```
+
+O launcher cloud escuta em `0.0.0.0` e usa `PORT` (fallback local `8501`). Consulte [docs/cloud-readiness.md](docs/cloud-readiness.md). Os providers locais (Dify/LM Studio/JEV) ainda precisam de URLs acessíveis externamente e serão configurados na próxima etapa.
+
 Para o ambiente completo de desenvolvimento:
 
 ```bash

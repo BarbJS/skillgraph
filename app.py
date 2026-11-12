@@ -88,8 +88,10 @@ def stream_production_rag(
     yield from client.stream_chat(query, conversation_id=conversation_id)
 
 
-LOG_PATH = PROJECT_ROOT / "logs" / "skillgraph.jsonl"
-STATE_DIR = PROJECT_ROOT / "state"
+LOG_PATH = Path(
+    os.getenv("OBSERVABILITY_LOG_PATH", str(PROJECT_ROOT / "logs" / "skillgraph.jsonl"))
+)
+STATE_DIR = Path(os.getenv("SKILLGRAPH_STATE_DIR", str(PROJECT_ROOT / "state")))
 
 
 def _get_session_store():
@@ -100,8 +102,14 @@ def _get_feedback_store():
     return cached_feedback_store(str(STATE_DIR / "feedback.sqlite"))
 
 
-store = _get_session_store()
-feedback_store = _get_feedback_store()
+try:
+    store = _get_session_store()
+    feedback_store = _get_feedback_store()
+except OSError as exc:
+    raise RuntimeError(
+        "Não foi possível inicializar o estado local. "
+        "Configure um diretório gravável em SKILLGRAPH_STATE_DIR."
+    ) from exc
 _startup_mark("persistent stores")
 
 

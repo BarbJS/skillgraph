@@ -1,4 +1,4 @@
-.PHONY: check test package-etapa1 audit-delivery bootstrap up down status smoke bootstrap-flaml train-ml bootstrap-crewai run run-crewai evaluate-ai evaluate-ai-live pytest install-dev install-prod install-ml install-evals lint ci release-check benchmark-performance
+.PHONY: check test package-etapa1 audit-delivery bootstrap up down status smoke bootstrap-flaml train-ml bootstrap-crewai run run-cloud run-crewai evaluate-ai evaluate-ai-live pytest install-dev install-prod install-ml install-evals lint ci release-check benchmark-performance
 
 DEV_PYTHON := .venv/bin/python
 DEV_PRE_COMMIT := .venv/bin/pre-commit
@@ -33,6 +33,9 @@ PYTEST := .venv/bin/pytest
 
 run: bootstrap-crewai
 	./scripts/start-crewai-streamlit.sh
+
+run-cloud:
+	./scripts/start-streamlit.sh
 
 package-etapa1:
 	bash scripts/package-etapa1.sh

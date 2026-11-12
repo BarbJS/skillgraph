@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Any
 from src.alerting import AlertManager
 
-LOG_PATH = Path(os.getenv("OBSERVABILITY_LOG_PATH", "logs/observability.jsonl"))
+LOG_PATH = Path(
+    os.getenv("OBSERVABILITY_LOG_PATH", "logs/observability.jsonl")
+).expanduser()
 _CURRENT_TRACE: contextvars.ContextVar["TraceContext | None"] = contextvars.ContextVar(
     "skillgraph_trace", default=None
 )

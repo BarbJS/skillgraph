@@ -1,3 +1,6 @@
-# Production application profile. Install the optional ML, CrewAI and eval groups
-# separately when those features are deployed or executed.
+# Cloud-ready production profile for the Streamlit web application.
+# Includes runtime, CrewAI routes and ML inference; evaluation/training extras
+# remain in requirements-evals.txt and the explicit ML training workflow.
 -r requirements-base.txt
+-r requirements-crewai.txt
+-r requirements-ml.txt
