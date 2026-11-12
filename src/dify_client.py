@@ -147,10 +147,17 @@ def _set_span_usage(span: Any, usage: Mapping[str, Any], *, query: str = "", ans
     )
 
 
+def _is_dify_cloud_base(value: str) -> bool:
+    return value.casefold() in {
+        "https://api.dify.ai/v1",
+        "https://api.dify.ai",
+    }
+
+
 class DifyClient:
     def __init__(self, base_url: str, api_key: str, user_id: str, *, timeout: tuple[float, float] = (10.0, 180.0), session: requests.Session | None = None, trace: TraceContext | None = None):
         normalized_base_url = base_url.rstrip("/")
-        if normalized_base_url.endswith("/v1"):
+        if normalized_base_url.endswith("/v1") and not _is_dify_cloud_base(normalized_base_url):
             normalized_base_url = normalized_base_url[:-3].rstrip("/")
         if normalized_base_url.endswith("/chat-messages"):
             normalized_base_url = normalized_base_url[: -len("/chat-messages")].rstrip("/")
@@ -167,7 +174,7 @@ class DifyClient:
     ) -> "DifyClient":
         base_url = os.getenv("DIFY_API_BASE_URL", "http://localhost").strip()
         base_url = base_url.rstrip("/")
-        if base_url.endswith("/v1"):
+        if base_url.endswith("/v1") and not _is_dify_cloud_base(base_url):
             base_url = base_url[:-3].rstrip("/")
         if base_url.endswith("/chat-messages"):
             base_url = base_url[: -len("/chat-messages")].rstrip("/")
@@ -193,7 +200,18 @@ class DifyClient:
         if span:
             span.__enter__()
         try:
-            response = self.session.post(f"{self.base_url}/v1/chat-messages", headers=headers, json=payload, stream=True, timeout=self.timeout)
+            endpoint = (
+                f"{self.base_url}/chat-messages"
+                if self.base_url.endswith("/v1")
+                else f"{self.base_url}/v1/chat-messages"
+            )
+            response = self.session.post(
+                endpoint,
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=self.timeout,
+            )
             with response:
                 if response.status_code in (401, 403):
                     raise DifyClientError("A API do Dify recusou a chave. Verifique DIFY_API_KEY e confirme que ela pertence ao Chatflow local publicado.")
