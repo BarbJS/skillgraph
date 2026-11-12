@@ -79,12 +79,35 @@ def test_stream_chat_parses_dify_events_without_logging_key():
     assert session.payload["json"]["response_mode"] == "streaming"
 
 
-def test_high_demand_workflow_is_retried_before_answer_is_streamed(monkeypatch):
+def test_dify_does_not_retry_quota_failure(monkeypatch):
     monkeypatch.setattr("src.dify_client.time.sleep", lambda _: None)
     failed = FakeResponse(
         [
             "event: workflow_finished",
-            'data: {"status":"failed","error":"This model is currently experiencing high demand"}',
+            'data: {"status":"failed","error":"resource exhausted quota exceeded"}',
+            "",
+        ]
+    )
+    session = SequenceSession([failed, FakeResponse(_successful_events())])
+    client = DifyClient(
+        "http://localhost",
+        "key",
+        "user",
+        session=session,
+        max_retries=1,
+        retry_backoff_seconds=0,
+    )
+    with pytest.raises(DifyClientError, match="resource exhausted"):
+        list(client.stream_chat("pergunta"))
+    assert session.calls == 1
+
+
+def test_temporarily_unavailable_workflow_is_retried_before_answer_is_streamed(monkeypatch):
+    monkeypatch.setattr("src.dify_client.time.sleep", lambda _: None)
+    failed = FakeResponse(
+        [
+            "event: workflow_finished",
+            'data: {"status":"failed","error":"The provider is temporarily unavailable"}',
             "",
         ]
     )
@@ -132,7 +155,7 @@ def test_transient_failure_after_partial_answer_is_not_retried(monkeypatch):
             'data: {"answer":"parcial"}',
             "",
             "event: workflow_finished",
-            'data: {"status":"failed","error":"high demand"}',
+            'data: {"status":"failed","error":"rate limit exceeded"}',
             "",
         ]
     )
@@ -146,7 +169,7 @@ def test_transient_failure_after_partial_answer_is_not_retried(monkeypatch):
         retry_backoff_seconds=0,
     )
 
-    with pytest.raises(DifyClientError, match="high demand"):
+    with pytest.raises(DifyClientError, match="rate limit exceeded"):
         list(client.stream_chat("pergunta"))
     assert session.calls == 1
 
@@ -159,7 +182,7 @@ def test_dify_timeout_defaults_are_bounded(monkeypatch):
     client = DifyClient("http://localhost", "key", "user")
     assert client.timeout == (10.0, 60.0)
     assert client.total_timeout_seconds == 120.0
-    assert client.max_retries == 1
+    assert client.max_retries == 0
 
 
 def test_dify_timeout_configuration_is_validated():

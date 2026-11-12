@@ -14,17 +14,21 @@ from src.observability import TraceContext
 
 
 _TRANSIENT_HTTP_STATUS = {408, 425, 429, 500, 502, 503, 504}
-_TRANSIENT_ERROR_MARKERS = (
-    "high demand",
+_QUOTA_ERROR_MARKERS = (
+    "quota",
+    "resource exhausted",
+    "too many requests",
     "rate limit",
     "rate_limit",
+    "high demand",
+)
+_TRANSIENT_ERROR_MARKERS = (
     "temporarily unavailable",
     "temporary unavailable",
     "try again later",
     "service unavailable",
     "overloaded",
     "overload",
-    "resource exhausted",
     "timed out",
     "timeout",
     "tempo limite",
@@ -36,8 +40,17 @@ def _is_transient_detail(value: Any) -> bool:
     return any(marker in detail for marker in _TRANSIENT_ERROR_MARKERS)
 
 
+def _is_quota_error(value: Any) -> bool:
+    detail = str(value or "").casefold()
+    return "http 429" in detail or any(
+        marker in detail for marker in _QUOTA_ERROR_MARKERS
+    )
+
+
 def _is_transient_error(value: Any) -> bool:
     detail = str(value or "").casefold()
+    if _is_quota_error(detail):
+        return False
     if _is_transient_detail(detail):
         return True
     return any(f"http {status}" in detail for status in _TRANSIENT_HTTP_STATUS)
@@ -261,7 +274,7 @@ class DifyClient:
         self.trace = trace
         self.max_retries = self._nonnegative_int(
             max_retries,
-            os.getenv("DIFY_MAX_RETRIES", "1"),
+            os.getenv("DIFY_MAX_RETRIES", "0"),
             "DIFY_MAX_RETRIES",
         )
         self.retry_backoff_seconds = self._nonnegative_float(

@@ -157,7 +157,7 @@ A configuração de referência permanece em `config/dify-chatflow-reference.jso
 
 O cliente do projeto usa `DIFY_API_BASE_URL` e `DIFY_API_KEY`. Ele aceita a base local e a base cloud com ou sem `/v1`, normalizando o endpoint para `/v1/chat-messages` sem duplicar o caminho. O parser trata eventos Chatflow `message`, `agent_message`, `message_end`, `workflow_finished` e falhas do workflow, porque o Chatflow Cloud pode encerrar o stream sem emitir apenas chunks `message`.
 
-Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente. Falhas transitórias do provider, como HTTP 429/5xx ou mensagens de alta demanda, recebem até `DIFY_MAX_RETRIES` novas tentativas com backoff; erros permanentes não são repetidos e uma resposta parcial nunca é duplicada. Os timeouts padrão são 10s para conexão, 60s para leitura e 120s para a requisição completa, evitando que uma chamada bloqueie a interface por vários minutos.
+Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente. Falhas transitórias do provider podem receber tentativas adicionais somente quando `DIFY_MAX_RETRIES` for explicitamente configurado; o padrão de produção é `0`, para nunca repetir quota/rate limit acidentalmente. Erros permanentes não são repetidos e uma resposta parcial nunca é duplicada. Os timeouts padrão são 10s para conexão, 60s para leitura e 120s para a requisição completa, evitando que uma chamada bloqueie a interface por vários minutos.
 
 #### Decisão sobre o LLM único de produção
 
@@ -265,6 +265,8 @@ LM Studio local continua marcado como local ou sem preço quando não há tarifa
 ```env
 GEMINI_API_KEY=sua-chave
 GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MAX_ATTEMPTS=1
+GEMINI_ALLOW_FALLBACK=false
 GEMINI_FALLBACK_MODEL=gemini-flash-lite-latest
 GEMINI_TIMEOUT_SECONDS=120
 GEMINI_MAX_OUTPUT_TOKENS=5400
@@ -272,7 +274,7 @@ GEMINI_INPUT_USD_PER_1M=
 GEMINI_OUTPUT_USD_PER_1M=
 ```
 
-O Langfuse permanece opcional e recebe somente metadados agregados, sem conteúdo privado.
+O Langfuse permanece opcional e recebe somente metadados agregados, sem conteúdo privado. O Gemini faz uma única chamada por síntese por padrão (`GEMINI_MAX_ATTEMPTS=1`); fallback é desligado (`GEMINI_ALLOW_FALLBACK=false`) e quota/rate limit não dispara modelo alternativo.
 
 ## 6. Golden Dataset e RAG como regressão executável
 

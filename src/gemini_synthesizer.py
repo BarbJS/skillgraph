@@ -51,7 +51,17 @@ class GeminiSynthesizer:
     ) -> None:
         self.enabled = True if enabled is None else enabled
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        configured_model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+        self.model = (
+            "gemini-3.8-flash"
+            if configured_model.strip() == "gemini-2.5-flash"
+            else configured_model.strip()
+        )
+        self.allow_fallback = self._env_bool("GEMINI_ALLOW_FALLBACK", False)
+        self.max_attempts = self._positive_int(
+            os.getenv("GEMINI_MAX_ATTEMPTS", "1"),
+            "GEMINI_MAX_ATTEMPTS",
+        )
         raw_timeout = timeout if timeout is not None else os.getenv("GEMINI_TIMEOUT_SECONDS", "60")
         try:
             self.timeout = float(raw_timeout)
@@ -66,6 +76,50 @@ class GeminiSynthesizer:
         self.output_usd_per_1m = self._price(
             output_usd_per_1m, os.getenv("GEMINI_OUTPUT_USD_PER_1M", "")
         )
+
+    @staticmethod
+    def _env_bool(name: str, default: bool) -> bool:
+        raw = os.getenv(name)
+        if raw is None:
+            return default
+        return raw.strip().casefold() in {"1", "true", "yes", "sim"}
+
+    @staticmethod
+    def _positive_int(configured: str, name: str) -> int:
+        try:
+            value = int(configured.strip())
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise GeminiSynthesisError(f"{name} deve ser um inteiro positivo.") from exc
+        if value <= 0:
+            raise GeminiSynthesisError(f"{name} deve ser maior que zero.")
+        return value
+
+    @staticmethod
+    def _is_quota_or_rate_limit(status_code: int, detail: str) -> bool:
+        lowered = detail.casefold()
+        return status_code == 429 or any(
+            marker in lowered
+            for marker in (
+                "quota",
+                "rate limit",
+                "rate_limit",
+                "resource exhausted",
+                "too many requests",
+                "high demand",
+            )
+        )
+
+    @staticmethod
+    def _is_model_unavailable(status_code: int, detail: str) -> bool:
+        lowered = detail.casefold()
+        return status_code == 404 and any(
+            marker in lowered
+            for marker in ("model", "not found", "unavailable", "does not exist")
+        )
+
+    @staticmethod
+    def _is_retryable_status(status_code: int) -> bool:
+        return status_code in {500, 502, 503, 504}
 
     @staticmethod
     def _price(value: float | None, configured: str) -> float | None:
@@ -133,19 +187,20 @@ class GeminiSynthesizer:
                 "maxOutputTokens": max_output_tokens,
             },
         }
-        model_candidates = [self.model]
         fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-flash-lite-latest").strip()
-        if self.model == "gemini-2.5-flash":
-            model_candidates = ["gemini-3.8-flash"]
-        if fallback_model and fallback_model not in model_candidates:
+        model_candidates = [self.model]
+        if self.allow_fallback and fallback_model and fallback_model not in model_candidates:
             model_candidates.append(fallback_model)
         response = None
         last_error = ""
         actual_model = self.model
         try:
-            retryable_statuses = {404, 429, 500, 502, 503, 504}
-            for candidate_model in model_candidates:
+            candidate_index = 0
+            attempts = 0
+            while candidate_index < len(model_candidates) and attempts < self.max_attempts:
+                candidate_model = model_candidates[candidate_index]
                 actual_model = candidate_model
+                attempts += 1
                 response = self.session.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{candidate_model}:generateContent",
                     params={"key": self.api_key},
@@ -162,9 +217,22 @@ class GeminiSynthesizer:
                 except (ValueError, TypeError):
                     pass
                 last_error = f"HTTP {response.status_code}: {detail}".strip()
-                if response.status_code not in retryable_statuses:
+                if self._is_quota_or_rate_limit(response.status_code, detail):
                     break
+                if self._is_model_unavailable(response.status_code, detail):
+                    candidate_index += 1
+                    continue
+                if self._is_retryable_status(response.status_code) and attempts < self.max_attempts:
+                    continue
+                break
             if response is None or response.status_code >= 400:
+                if self._is_quota_or_rate_limit(
+                    response.status_code if response is not None else 0,
+                    last_error,
+                ):
+                    raise GeminiSynthesisError(
+                        "A cota ou o limite temporário do Gemini foi atingido; nenhuma chamada adicional foi feita."
+                    )
                 raise GeminiSynthesisError(
                     f"O Gemini não conseguiu gerar a resposta ({last_error or 'erro desconhecido'})."
                 )

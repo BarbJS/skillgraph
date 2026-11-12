@@ -30,6 +30,14 @@ def test_gemini_defaults_to_current_flash_model(monkeypatch):
     assert client.model == "gemini-3.8-flash"
 
 
+def test_gemini_defaults_to_one_attempt_without_fallback(monkeypatch):
+    monkeypatch.delenv("GEMINI_MAX_ATTEMPTS", raising=False)
+    monkeypatch.delenv("GEMINI_ALLOW_FALLBACK", raising=False)
+    client = GeminiSynthesizer(enabled=False, api_key="key", session=Session())
+    assert client.max_attempts == 1
+    assert client.allow_fallback is False
+
+
 def test_disabled_gemini_does_not_call_api():
     session = Session()
     client = GeminiSynthesizer(enabled=False, api_key="key", session=session)

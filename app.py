@@ -1308,11 +1308,20 @@ if question or uploaded_files:
                     )
                     agent_handled = True
                     answer_already_synthesized = True
-                elif agent_status in {"disabled", "error"}:
+                elif agent_status == "disabled":
                     use_agent_runtime = False
                     trace.route = route.intent.value
                     progress.info(
                         "Fluxo multiagente indisponível; usando o fluxo compatível."
+                    )
+                elif agent_status == "error":
+                    # Do not invoke Dify/Gemini a second time after a provider
+                    # failure in the agent flow; this would multiply quota usage.
+                    raise DifyClientError(
+                        agent_result.get(
+                            "error",
+                            "O fluxo multiagente falhou; a solicitação não será repetida automaticamente.",
+                        )
                     )
                 elif agent_status in {"blocked", "clarify", "local"}:
                     answer = agent_result.get(
