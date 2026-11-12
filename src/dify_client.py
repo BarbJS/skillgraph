@@ -154,6 +154,32 @@ def _is_dify_cloud_base(value: str) -> bool:
     }
 
 
+def _text_from_workflow_output(value: Any) -> str:
+    """Extract a user-facing answer from a Chatflow workflow output."""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, Mapping):
+        for key in ("answer", "text", "response", "content", "output", "result"):
+            candidate = _text_from_workflow_output(value.get(key))
+            if candidate:
+                return candidate
+    if isinstance(value, list):
+        for item in value:
+            candidate = _text_from_workflow_output(item)
+            if candidate:
+                return candidate
+    return ""
+
+
+def _workflow_failure_detail(event: Mapping[str, Any]) -> str:
+    data = event.get("data")
+    if isinstance(data, Mapping):
+        detail = data.get("error") or data.get("message") or data.get("status")
+        if detail:
+            return str(detail)
+    return str(event.get("error") or event.get("message") or "status=failed")
+
+
 class DifyClient:
     def __init__(self, base_url: str, api_key: str, user_id: str, *, timeout: tuple[float, float] = (10.0, 180.0), session: requests.Session | None = None, trace: TraceContext | None = None):
         normalized_base_url = base_url.rstrip("/")
@@ -197,6 +223,11 @@ class DifyClient:
         span = self.trace.span("dify.chat_stream", "dify", task_name="chat-messages") if self.trace else None
         self._last_usage: dict[str, Any] = {}
         self._stream_answer = ""
+        self._stream_conversation_id = conversation_id
+        self._stream_message_id = ""
+        self._stream_sources: list[dict[str, Any]] = []
+        self._stream_workflow_failure = ""
+        self._stream_event_types: list[str] = []
         if span:
             span.__enter__()
         try:
@@ -221,8 +252,51 @@ class DifyClient:
                     raise DifyClientError(f"O Dify retornou HTTP {response.status_code}: {_safe_error_detail(response)}")
                 header_usage = _usage_from_response_headers(response)
                 for event in _parse_sse(response.iter_lines(decode_unicode=True)):
-                    if event.get("event") == "message":
+                    event_type = event.get("event")
+                    if event_type:
+                        self._stream_event_types.append(str(event_type))
+                    if event_type in {"message", "agent_message"}:
                         self._stream_answer += str(event.get("answer", ""))
+                        self._stream_conversation_id = str(
+                            event.get("conversation_id") or self._stream_conversation_id
+                        )
+                        self._stream_message_id = str(
+                            event.get("message_id") or self._stream_message_id
+                        )
+                    elif event_type == "message_end":
+                        self._stream_conversation_id = str(
+                            event.get("conversation_id") or self._stream_conversation_id
+                        )
+                        self._stream_message_id = str(
+                            event.get("message_id") or self._stream_message_id
+                        )
+                        self._stream_sources.extend(_extract_sources(event.get("metadata")))
+                        self._stream_sources.extend(_extract_sources(event.get("data")))
+                    elif event_type == "workflow_finished":
+                        status = str(event.get("status") or "")
+                        data = event.get("data")
+                        if isinstance(data, Mapping):
+                            status = str(data.get("status") or status)
+                        if status in {"failed", "stopped"}:
+                            self._stream_workflow_failure = _workflow_failure_detail(event)
+                            raise DifyClientError(
+                                f"O Chatflow falhou durante a execução: {self._stream_workflow_failure}"
+                            )
+                        workflow_answer = _text_from_workflow_output(event.get("outputs"))
+                        if not workflow_answer and isinstance(data, Mapping):
+                            workflow_answer = _text_from_workflow_output(data.get("outputs"))
+                        if workflow_answer and not self._stream_answer:
+                            self._stream_answer = workflow_answer
+                            yield {
+                                "event": "message",
+                                "answer": workflow_answer,
+                                "conversation_id": self._stream_conversation_id,
+                                "message_id": self._stream_message_id,
+                            }
+                    elif event_type == "error":
+                        raise DifyClientError(
+                            f"O Chatflow falhou durante a execução: {_workflow_failure_detail(event)}"
+                        )
                     usage = _usage_from_event(event)
                     if usage:
                         self._last_usage = usage
@@ -246,18 +320,36 @@ class DifyClient:
                 span.__exit__(None, None, None)
             self._last_usage = {}
             self._stream_answer = ""
+            self._stream_conversation_id = conversation_id
+            self._stream_message_id = ""
+            self._stream_sources = []
 
     def chat(self, query: str, *, conversation_id: str = "", inputs: Mapping[str, Any] | None = None) -> ChatResult:
         result = ChatResult(conversation_id=conversation_id)
         for event in self.stream_chat(query, conversation_id=conversation_id, inputs=inputs):
             event_type = event.get("event")
-            if event_type == "message":
+            if event_type in {"message", "agent_message"}:
                 result.answer += str(event.get("answer", ""))
                 result.conversation_id = str(event.get("conversation_id") or result.conversation_id)
                 result.message_id = str(event.get("message_id") or result.message_id)
+            elif event_type == "message_end":
+                result.conversation_id = str(event.get("conversation_id") or result.conversation_id)
+                result.message_id = str(event.get("message_id") or result.message_id)
+                result.sources.extend(_extract_sources(event.get("metadata")))
+                result.sources.extend(_extract_sources(event.get("data")))
+            elif event_type == "workflow_finished":
+                data = event.get("data")
+                status = str(event.get("status") or (data.get("status") if isinstance(data, Mapping) else ""))
+                if status in {"failed", "stopped"}:
+                    raise DifyClientError(
+                        f"O Chatflow falhou durante a execução: {_workflow_failure_detail(event)}"
+                    )
+                if not result.answer:
+                    result.answer = _text_from_workflow_output(event.get("outputs"))
+                    if not result.answer and isinstance(data, Mapping):
+                        result.answer = _text_from_workflow_output(data.get("outputs"))
             usage = _usage_from_event(event)
             if usage:
-                self._last_usage = usage
                 result.usage = dict(usage)
                 result.cost = _cost_value(usage)
                 result.cost_source = (
@@ -266,18 +358,17 @@ class DifyClient:
             elif event_type == "message_end":
                 result.conversation_id = str(event.get("conversation_id") or result.conversation_id)
 
-            if event_type == "message_end":
-                result.conversation_id = str(event.get("conversation_id") or result.conversation_id)
-                result.message_id = str(event.get("message_id") or result.message_id)
-                result.sources.extend(_extract_sources(event.get("metadata")))
-                result.sources.extend(_extract_sources(event.get("data")))
-            elif event_type == "error":
+            if event_type == "error":
                 raise DifyClientError(str(event.get("message") or event.get("code") or "O Dify retornou um erro durante o streaming."))
-            elif event_type == "workflow_failed":
-                data = event.get("data")
-                raise DifyClientError(str(data.get("error") if isinstance(data, dict) else "O workflow do Dify falhou durante o streaming."))
         if not result.answer:
-            raise DifyClientError("O Dify encerrou o streaming sem retornar uma resposta.")
+            failure = getattr(self, "_stream_workflow_failure", "")
+            failure = getattr(self, "_stream_workflow_failure", "")
+            events = ", ".join(getattr(self, "_stream_event_types", []))
+            detail = f" Detalhe: {failure}" if failure else ""
+            event_detail = f" Eventos recebidos: {events}." if events else " Nenhum evento SSE foi recebido."
+            raise DifyClientError(
+                f"O Dify encerrou o streaming sem retornar uma resposta.{detail}{event_detail}"
+            )
         return result
 
 

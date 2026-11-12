@@ -80,6 +80,37 @@ def test_cloud_base_url_normalizes_api_path():
     assert session.payload["url"] == "https://api.dify.ai/v1/chat-messages"
 
 
+def test_chatflow_workflow_finished_output_is_used_when_no_message_chunk():
+    events = [
+        "event: workflow_finished",
+        'data: {"status":"succeeded","outputs":{"answer":"Resposta do workflow"}}',
+        "",
+    ]
+    session = FakeSession(FakeResponse(events))
+    client = DifyClient(
+        "https://api.dify.ai/v1", "secret-key", "user", session=session
+    )
+
+    result = client.chat("pergunta")
+
+    assert result.answer == "Resposta do workflow"
+
+
+def test_chatflow_workflow_failure_exposes_provider_detail():
+    events = [
+        "event: workflow_finished",
+        'data: {"status":"failed","outputs":{},"error":"Gemini indisponível"}',
+        "",
+    ]
+    session = FakeSession(FakeResponse(events))
+    client = DifyClient(
+        "https://api.dify.ai/v1", "secret-key", "user", session=session
+    )
+
+    with pytest.raises(DifyClientError, match="Gemini indisponível"):
+        list(client.stream_chat("pergunta"))
+
+
 def test_stream_chat_records_provider_usage_on_trace():
     events = [
         "event: message",
