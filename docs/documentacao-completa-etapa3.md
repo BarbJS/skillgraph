@@ -157,7 +157,7 @@ A configuração de referência permanece em `config/dify-chatflow-reference.jso
 
 O cliente do projeto usa `DIFY_API_BASE_URL` e `DIFY_API_KEY`. Ele aceita a base local e a base cloud com ou sem `/v1`, normalizando o endpoint para `/v1/chat-messages` sem duplicar o caminho. O parser trata eventos Chatflow `message`, `agent_message`, `message_end`, `workflow_finished` e falhas do workflow, porque o Chatflow Cloud pode encerrar o stream sem emitir apenas chunks `message`.
 
-Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente. Falhas transitórias do provider, como HTTP 429/5xx ou mensagens de alta demanda, recebem até `DIFY_MAX_RETRIES` novas tentativas com backoff; erros permanentes não são repetidos e uma resposta parcial nunca é duplicada.
+Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente. Falhas transitórias do provider, como HTTP 429/5xx ou mensagens de alta demanda, recebem até `DIFY_MAX_RETRIES` novas tentativas com backoff; erros permanentes não são repetidos e uma resposta parcial nunca é duplicada. Os timeouts padrão são 10s para conexão, 60s para leitura e 120s para a requisição completa, evitando que uma chamada bloqueie a interface por vários minutos.
 
 #### Decisão sobre o LLM único de produção
 

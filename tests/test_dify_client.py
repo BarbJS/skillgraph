@@ -151,6 +151,22 @@ def test_transient_failure_after_partial_answer_is_not_retried(monkeypatch):
     assert session.calls == 1
 
 
+def test_dify_timeout_defaults_are_bounded(monkeypatch):
+    monkeypatch.delenv("DIFY_CONNECT_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("DIFY_READ_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("DIFY_TOTAL_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("DIFY_MAX_RETRIES", raising=False)
+    client = DifyClient("http://localhost", "key", "user")
+    assert client.timeout == (10.0, 60.0)
+    assert client.total_timeout_seconds == 120.0
+    assert client.max_retries == 1
+
+
+def test_dify_timeout_configuration_is_validated():
+    with pytest.raises(DifyClientError, match="DIFY_TOTAL_TIMEOUT_SECONDS"):
+        DifyClient("http://localhost", "key", "user", total_timeout_seconds=0)
+
+
 def test_cloud_base_url_normalizes_api_path():
     session = FakeSession(
         FakeResponse(

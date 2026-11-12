@@ -25,6 +25,9 @@ _TRANSIENT_ERROR_MARKERS = (
     "overloaded",
     "overload",
     "resource exhausted",
+    "timed out",
+    "timeout",
+    "tempo limite",
 )
 
 
@@ -219,11 +222,12 @@ class DifyClient:
         api_key: str,
         user_id: str,
         *,
-        timeout: tuple[float, float] = (10.0, 180.0),
+        timeout: tuple[float, float] | None = None,
         session: requests.Session | None = None,
         trace: TraceContext | None = None,
         max_retries: int | None = None,
         retry_backoff_seconds: float | None = None,
+        total_timeout_seconds: float | None = None,
     ):
         normalized_base_url = base_url.rstrip("/")
         if normalized_base_url.endswith("/v1") and not _is_dify_cloud_base(normalized_base_url):
@@ -233,12 +237,31 @@ class DifyClient:
         self.base_url = normalized_base_url
         self.api_key = api_key
         self.user_id = user_id
-        self.timeout = timeout
+        connect_timeout = self._positive_float(
+            os.getenv("DIFY_CONNECT_TIMEOUT_SECONDS", "10"),
+            "DIFY_CONNECT_TIMEOUT_SECONDS",
+        )
+        read_timeout = self._positive_float(
+            os.getenv("DIFY_READ_TIMEOUT_SECONDS", "60"),
+            "DIFY_READ_TIMEOUT_SECONDS",
+        )
+        if timeout is not None:
+            connect_timeout, read_timeout = timeout
+        self.timeout = (
+            self._positive_float(connect_timeout, "DIFY_CONNECT_TIMEOUT_SECONDS"),
+            self._positive_float(read_timeout, "DIFY_READ_TIMEOUT_SECONDS"),
+        )
+        self.total_timeout_seconds = self._positive_float(
+            total_timeout_seconds
+            if total_timeout_seconds is not None
+            else os.getenv("DIFY_TOTAL_TIMEOUT_SECONDS", "120"),
+            "DIFY_TOTAL_TIMEOUT_SECONDS",
+        )
         self.session = session or requests.Session()
         self.trace = trace
         self.max_retries = self._nonnegative_int(
             max_retries,
-            os.getenv("DIFY_MAX_RETRIES", "2"),
+            os.getenv("DIFY_MAX_RETRIES", "1"),
             "DIFY_MAX_RETRIES",
         )
         self.retry_backoff_seconds = self._nonnegative_float(
@@ -246,6 +269,16 @@ class DifyClient:
             os.getenv("DIFY_RETRY_BACKOFF_SECONDS", "1"),
             "DIFY_RETRY_BACKOFF_SECONDS",
         )
+
+    @staticmethod
+    def _positive_float(value: float | str, name: str) -> float:
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError) as exc:
+            raise DifyClientError(f"{name} deve ser numérico e maior que zero.") from exc
+        if parsed <= 0:
+            raise DifyClientError(f"{name} deve ser maior que zero.")
+        return parsed
 
     @staticmethod
     def _nonnegative_int(value: int | None, configured: str, name: str) -> int:
@@ -303,12 +336,22 @@ class DifyClient:
         *,
         attempt: int,
     ) -> Iterator[dict[str, Any]]:
+        response_timeout = self.timeout
+        deadline = getattr(self, "_stream_deadline", None)
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise requests.exceptions.Timeout("Dify total timeout exceeded")
+            response_timeout = (
+                min(response_timeout[0], remaining),
+                min(response_timeout[1], remaining),
+            )
         response = self.session.post(
             endpoint,
             headers=headers,
             json=payload,
             stream=True,
-            timeout=self.timeout,
+            timeout=response_timeout,
         )
         with response:
             if response.status_code in (401, 403):
@@ -423,6 +466,7 @@ class DifyClient:
         self._stream_sources = []
         self._stream_workflow_failure = ""
         self._stream_event_types = []
+        self._stream_deadline = time.monotonic() + self.total_timeout_seconds
         if span:
             span.__enter__()
         try:
@@ -447,6 +491,10 @@ class DifyClient:
                     delay = self._retry_delay(self.retry_backoff_seconds, attempt)
                     if delay:
                         time.sleep(delay)
+        except requests.exceptions.Timeout as exc:
+            raise DifyClientError(
+                "O Chatflow do Dify excedeu o tempo limite. Tente novamente em alguns instantes."
+            ) from exc
         except requests.RequestException as exc:
             raise DifyClientError("Não foi possível conectar à API do Dify. Confirme a URL, a chave e a disponibilidade do Chatflow.") from exc
         except Exception as exc:
@@ -467,6 +515,7 @@ class DifyClient:
             self._stream_conversation_id = conversation_id
             self._stream_message_id = ""
             self._stream_sources = []
+            self._stream_deadline = None
 
     def chat(self, query: str, *, conversation_id: str = "", inputs: Mapping[str, Any] | None = None) -> ChatResult:
         result = ChatResult(conversation_id=conversation_id)
