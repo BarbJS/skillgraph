@@ -33,6 +33,27 @@ class FakeSession:
         return self.response
 
 
+class SequenceSession:
+    def __init__(self, responses: list[FakeResponse]) -> None:
+        self.responses = iter(responses)
+        self.calls = 0
+
+    def post(self, url, *, headers, json, stream, timeout):
+        self.calls += 1
+        return next(self.responses)
+
+
+def _successful_events() -> list[str]:
+    return [
+        "event: message",
+        'data: {"answer":"resposta"}',
+        "",
+        "event: message_end",
+        'data: {"message_id":"m1"}',
+        "",
+    ]
+
+
 def test_stream_chat_parses_dify_events_without_logging_key():
     events = [
         "event: message",
@@ -56,6 +77,78 @@ def test_stream_chat_parses_dify_events_without_logging_key():
     assert session.payload["url"] == "http://localhost/v1/chat-messages"
     assert session.payload["headers"]["Authorization"] == "Bearer secret-key"
     assert session.payload["json"]["response_mode"] == "streaming"
+
+
+def test_high_demand_workflow_is_retried_before_answer_is_streamed(monkeypatch):
+    monkeypatch.setattr("src.dify_client.time.sleep", lambda _: None)
+    failed = FakeResponse(
+        [
+            "event: workflow_finished",
+            'data: {"status":"failed","error":"This model is currently experiencing high demand"}',
+            "",
+        ]
+    )
+    session = SequenceSession([failed, FakeResponse(_successful_events())])
+    client = DifyClient(
+        "https://api.dify.ai/v1",
+        "secret-key",
+        "user",
+        session=session,
+        max_retries=1,
+        retry_backoff_seconds=0,
+    )
+
+    result = client.chat("pergunta")
+
+    assert result.answer == "resposta"
+    assert session.calls == 2
+
+
+def test_transient_http_error_is_retried(monkeypatch):
+    monkeypatch.setattr("src.dify_client.time.sleep", lambda _: None)
+    session = SequenceSession(
+        [FakeResponse([], status_code=503), FakeResponse(_successful_events())]
+    )
+    client = DifyClient(
+        "http://localhost",
+        "secret-key",
+        "user",
+        session=session,
+        max_retries=1,
+        retry_backoff_seconds=0,
+    )
+
+    result = client.chat("pergunta")
+
+    assert result.answer == "resposta"
+    assert session.calls == 2
+
+
+def test_transient_failure_after_partial_answer_is_not_retried(monkeypatch):
+    monkeypatch.setattr("src.dify_client.time.sleep", lambda _: None)
+    partial_failure = FakeResponse(
+        [
+            "event: message",
+            'data: {"answer":"parcial"}',
+            "",
+            "event: workflow_finished",
+            'data: {"status":"failed","error":"high demand"}',
+            "",
+        ]
+    )
+    session = SequenceSession([partial_failure, FakeResponse(_successful_events())])
+    client = DifyClient(
+        "http://localhost",
+        "secret-key",
+        "user",
+        session=session,
+        max_retries=1,
+        retry_backoff_seconds=0,
+    )
+
+    with pytest.raises(DifyClientError, match="high demand"):
+        list(client.stream_chat("pergunta"))
+    assert session.calls == 1
 
 
 def test_cloud_base_url_normalizes_api_path():

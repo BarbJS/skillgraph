@@ -33,6 +33,7 @@ Publicar uma versão pública e funcional do SkillGraph no Streamlit Community C
 
 3. **Preparar configuração cloud**
    - Configurar `DIFY_API_BASE_URL`, `DIFY_API_KEY` e `DIFY_USER_ID` para o Dify Cloud.
+   - Manter `DIFY_MAX_RETRIES=2` e `DIFY_RETRY_BACKOFF_SECONDS=1` para picos transitórios do provider, sem mascarar erros permanentes.
    - Configurar `GEMINI_API_KEY`, modelo, timeout e limites.
    - Configurar JEV e Langfuse somente se credenciais e endpoints forem fornecidos.
    - Manter secrets exclusivamente no painel do Streamlit Cloud.

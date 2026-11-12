@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -10,6 +11,37 @@ from typing import Any
 import requests
 
 from src.observability import TraceContext
+
+
+_TRANSIENT_HTTP_STATUS = {408, 425, 429, 500, 502, 503, 504}
+_TRANSIENT_ERROR_MARKERS = (
+    "high demand",
+    "rate limit",
+    "rate_limit",
+    "temporarily unavailable",
+    "temporary unavailable",
+    "try again later",
+    "service unavailable",
+    "overloaded",
+    "overload",
+    "resource exhausted",
+)
+
+
+def _is_transient_detail(value: Any) -> bool:
+    detail = str(value or "").casefold()
+    return any(marker in detail for marker in _TRANSIENT_ERROR_MARKERS)
+
+
+def _is_transient_error(value: Any) -> bool:
+    detail = str(value or "").casefold()
+    if _is_transient_detail(detail):
+        return True
+    return any(f"http {status}" in detail for status in _TRANSIENT_HTTP_STATUS)
+
+
+class _RetryableDifyError(RuntimeError):
+    """Internal signal for a safe retry before any answer was streamed."""
 
 
 class DifyClientError(RuntimeError):
@@ -181,7 +213,18 @@ def _workflow_failure_detail(event: Mapping[str, Any]) -> str:
 
 
 class DifyClient:
-    def __init__(self, base_url: str, api_key: str, user_id: str, *, timeout: tuple[float, float] = (10.0, 180.0), session: requests.Session | None = None, trace: TraceContext | None = None):
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        user_id: str,
+        *,
+        timeout: tuple[float, float] = (10.0, 180.0),
+        session: requests.Session | None = None,
+        trace: TraceContext | None = None,
+        max_retries: int | None = None,
+        retry_backoff_seconds: float | None = None,
+    ):
         normalized_base_url = base_url.rstrip("/")
         if normalized_base_url.endswith("/v1") and not _is_dify_cloud_base(normalized_base_url):
             normalized_base_url = normalized_base_url[:-3].rstrip("/")
@@ -193,6 +236,158 @@ class DifyClient:
         self.timeout = timeout
         self.session = session or requests.Session()
         self.trace = trace
+        self.max_retries = self._nonnegative_int(
+            max_retries,
+            os.getenv("DIFY_MAX_RETRIES", "2"),
+            "DIFY_MAX_RETRIES",
+        )
+        self.retry_backoff_seconds = self._nonnegative_float(
+            retry_backoff_seconds,
+            os.getenv("DIFY_RETRY_BACKOFF_SECONDS", "1"),
+            "DIFY_RETRY_BACKOFF_SECONDS",
+        )
+
+    @staticmethod
+    def _nonnegative_int(value: int | None, configured: str, name: str) -> int:
+        if value is not None:
+            parsed = value
+        else:
+            try:
+                parsed = int(configured.strip())
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise DifyClientError(f"{name} deve ser um inteiro não negativo.") from exc
+        if parsed < 0:
+            raise DifyClientError(f"{name} deve ser um inteiro não negativo.")
+        return parsed
+
+    @staticmethod
+    def _nonnegative_float(value: float | None, configured: str, name: str) -> float:
+        if value is not None:
+            parsed = value
+        else:
+            try:
+                parsed = float(configured.strip())
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise DifyClientError(f"{name} deve ser numérico e não negativo.") from exc
+        if parsed < 0:
+            raise DifyClientError(f"{name} deve ser numérico e não negativo.")
+        return parsed
+
+    def _reset_attempt_state(self, conversation_id: str) -> None:
+        self._last_usage = {}
+        self._stream_answer = ""
+        self._stream_conversation_id = conversation_id
+        self._stream_message_id = ""
+        self._stream_sources = []
+
+    def _retry_or_raise(
+        self,
+        detail: str,
+        *,
+        attempt: int,
+        has_answer: bool,
+    ) -> None:
+        if (
+            not has_answer
+            and _is_transient_error(detail)
+            and attempt < self.max_retries
+        ):
+            raise _RetryableDifyError(detail)
+        raise DifyClientError(detail)
+
+    def _stream_attempt(
+        self,
+        endpoint: str,
+        payload: Mapping[str, Any],
+        headers: Mapping[str, str],
+        *,
+        attempt: int,
+    ) -> Iterator[dict[str, Any]]:
+        response = self.session.post(
+            endpoint,
+            headers=headers,
+            json=payload,
+            stream=True,
+            timeout=self.timeout,
+        )
+        with response:
+            if response.status_code in (401, 403):
+                raise DifyClientError(
+                    "A API do Dify recusou a chave. Verifique DIFY_API_KEY e confirme que ela pertence ao Chatflow local publicado."
+                )
+            if response.status_code == 404:
+                raise DifyClientError(
+                    "Endpoint do Chatflow não encontrado. Confirme que o Chatflow está publicado e que DIFY_API_BASE_URL aponta para a instância correta do Dify."
+                )
+            if response.status_code >= 400:
+                detail = f"O Dify retornou HTTP {response.status_code}: {_safe_error_detail(response)}"
+                self._retry_or_raise(
+                    detail,
+                    attempt=attempt,
+                    has_answer=bool(self._stream_answer),
+                )
+            header_usage = _usage_from_response_headers(response)
+            for event in _parse_sse(response.iter_lines(decode_unicode=True)):
+                event_type = event.get("event")
+                if event_type:
+                    self._stream_event_types.append(str(event_type))
+                if event_type in {"message", "agent_message"}:
+                    self._stream_answer += str(event.get("answer", ""))
+                    self._stream_conversation_id = str(
+                        event.get("conversation_id") or self._stream_conversation_id
+                    )
+                    self._stream_message_id = str(
+                        event.get("message_id") or self._stream_message_id
+                    )
+                elif event_type == "message_end":
+                    self._stream_conversation_id = str(
+                        event.get("conversation_id") or self._stream_conversation_id
+                    )
+                    self._stream_message_id = str(
+                        event.get("message_id") or self._stream_message_id
+                    )
+                    self._stream_sources.extend(_extract_sources(event.get("metadata")))
+                    self._stream_sources.extend(_extract_sources(event.get("data")))
+                elif event_type == "workflow_finished":
+                    status = str(event.get("status") or "")
+                    data = event.get("data")
+                    if isinstance(data, Mapping):
+                        status = str(data.get("status") or status)
+                    if status in {"failed", "stopped"}:
+                        detail = f"O Chatflow falhou durante a execução: {_workflow_failure_detail(event)}"
+                        self._retry_or_raise(
+                            detail,
+                            attempt=attempt,
+                            has_answer=bool(self._stream_answer),
+                        )
+                    workflow_answer = _text_from_workflow_output(event.get("outputs"))
+                    if not workflow_answer and isinstance(data, Mapping):
+                        workflow_answer = _text_from_workflow_output(data.get("outputs"))
+                    if workflow_answer and not self._stream_answer:
+                        self._stream_answer = workflow_answer
+                        yield {
+                            "event": "message",
+                            "answer": workflow_answer,
+                            "conversation_id": self._stream_conversation_id,
+                            "message_id": self._stream_message_id,
+                        }
+                elif event_type == "error":
+                    detail = f"O Chatflow falhou durante a execução: {_workflow_failure_detail(event)}"
+                    self._retry_or_raise(
+                        detail,
+                        attempt=attempt,
+                        has_answer=bool(self._stream_answer),
+                    )
+                usage = _usage_from_event(event)
+                if usage:
+                    self._last_usage = usage
+                elif header_usage:
+                    self._last_usage = header_usage
+                yield event
+
+    @staticmethod
+    def _retry_delay(backoff_seconds: float, attempt: int) -> float:
+        return backoff_seconds * (2**attempt)
 
     @classmethod
     def from_environment(
@@ -221,13 +416,13 @@ class DifyClient:
         payload = {"inputs": dict(inputs or {}), "query": query, "response_mode": "streaming", "conversation_id": conversation_id, "user": self.user_id}
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json", "Accept": "text/event-stream"}
         span = self.trace.span("dify.chat_stream", "dify", task_name="chat-messages") if self.trace else None
-        self._last_usage: dict[str, Any] = {}
+        self._last_usage = {}
         self._stream_answer = ""
         self._stream_conversation_id = conversation_id
         self._stream_message_id = ""
-        self._stream_sources: list[dict[str, Any]] = []
+        self._stream_sources = []
         self._stream_workflow_failure = ""
-        self._stream_event_types: list[str] = []
+        self._stream_event_types = []
         if span:
             span.__enter__()
         try:
@@ -236,73 +431,22 @@ class DifyClient:
                 if self.base_url.endswith("/v1")
                 else f"{self.base_url}/v1/chat-messages"
             )
-            response = self.session.post(
-                endpoint,
-                headers=headers,
-                json=payload,
-                stream=True,
-                timeout=self.timeout,
-            )
-            with response:
-                if response.status_code in (401, 403):
-                    raise DifyClientError("A API do Dify recusou a chave. Verifique DIFY_API_KEY e confirme que ela pertence ao Chatflow local publicado.")
-                if response.status_code == 404:
-                    raise DifyClientError("Endpoint do Chatflow não encontrado. Confirme que o Chatflow está publicado e que DIFY_API_BASE_URL aponta para a instância correta do Dify.")
-                if response.status_code >= 400:
-                    raise DifyClientError(f"O Dify retornou HTTP {response.status_code}: {_safe_error_detail(response)}")
-                header_usage = _usage_from_response_headers(response)
-                for event in _parse_sse(response.iter_lines(decode_unicode=True)):
-                    event_type = event.get("event")
-                    if event_type:
-                        self._stream_event_types.append(str(event_type))
-                    if event_type in {"message", "agent_message"}:
-                        self._stream_answer += str(event.get("answer", ""))
-                        self._stream_conversation_id = str(
-                            event.get("conversation_id") or self._stream_conversation_id
-                        )
-                        self._stream_message_id = str(
-                            event.get("message_id") or self._stream_message_id
-                        )
-                    elif event_type == "message_end":
-                        self._stream_conversation_id = str(
-                            event.get("conversation_id") or self._stream_conversation_id
-                        )
-                        self._stream_message_id = str(
-                            event.get("message_id") or self._stream_message_id
-                        )
-                        self._stream_sources.extend(_extract_sources(event.get("metadata")))
-                        self._stream_sources.extend(_extract_sources(event.get("data")))
-                    elif event_type == "workflow_finished":
-                        status = str(event.get("status") or "")
-                        data = event.get("data")
-                        if isinstance(data, Mapping):
-                            status = str(data.get("status") or status)
-                        if status in {"failed", "stopped"}:
-                            self._stream_workflow_failure = _workflow_failure_detail(event)
-                            raise DifyClientError(
-                                f"O Chatflow falhou durante a execução: {self._stream_workflow_failure}"
-                            )
-                        workflow_answer = _text_from_workflow_output(event.get("outputs"))
-                        if not workflow_answer and isinstance(data, Mapping):
-                            workflow_answer = _text_from_workflow_output(data.get("outputs"))
-                        if workflow_answer and not self._stream_answer:
-                            self._stream_answer = workflow_answer
-                            yield {
-                                "event": "message",
-                                "answer": workflow_answer,
-                                "conversation_id": self._stream_conversation_id,
-                                "message_id": self._stream_message_id,
-                            }
-                    elif event_type == "error":
-                        raise DifyClientError(
-                            f"O Chatflow falhou durante a execução: {_workflow_failure_detail(event)}"
-                        )
-                    usage = _usage_from_event(event)
-                    if usage:
-                        self._last_usage = usage
-                    elif header_usage:
-                        self._last_usage = header_usage
-                    yield event
+            for attempt in range(self.max_retries + 1):
+                self._reset_attempt_state(conversation_id)
+                try:
+                    yield from self._stream_attempt(
+                        endpoint,
+                        payload,
+                        headers,
+                        attempt=attempt,
+                    )
+                    break
+                except _RetryableDifyError as exc:
+                    if attempt >= self.max_retries:
+                        raise DifyClientError(str(exc)) from exc
+                    delay = self._retry_delay(self.retry_backoff_seconds, attempt)
+                    if delay:
+                        time.sleep(delay)
         except requests.RequestException as exc:
             raise DifyClientError("Não foi possível conectar à API do Dify. Confirme a URL, a chave e a disponibilidade do Chatflow.") from exc
         except Exception as exc:

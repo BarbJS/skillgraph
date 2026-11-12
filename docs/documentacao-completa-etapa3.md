@@ -139,7 +139,7 @@ Streamlit Community Cloud
 Dify Cloud
   ├── Chatflow recriado/publicado
   ├── Knowledge Base reindexada
-  ├── Gemini 2.5 Flash — conversa
+  ├── Gemini 3.8 Flash — conversa
   └── gemini-embedding-001 — embeddings
 ```
 
@@ -151,13 +151,13 @@ A decisão de trocar somente os providers de produção, e não reescrever as ro
 
 O Dify local e o Dify Cloud são instâncias diferentes. O Chatflow e os vetores não são tratados como arquivos independentes que possam ser copiados sem validação. A Knowledge Base é recriada no Dify Cloud, os quatro documentos de `documents_rag/` são reenviados e reindexados, e o Chatflow é publicado novamente.
 
-A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial, Top K 3 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 2.5 Flash gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
+A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial, Top K 3 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 3.8 Flash gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
 
 #### Decisão sobre a API do Dify
 
 O cliente do projeto usa `DIFY_API_BASE_URL` e `DIFY_API_KEY`. Ele aceita a base local e a base cloud com ou sem `/v1`, normalizando o endpoint para `/v1/chat-messages` sem duplicar o caminho. O parser trata eventos Chatflow `message`, `agent_message`, `message_end`, `workflow_finished` e falhas do workflow, porque o Chatflow Cloud pode encerrar o stream sem emitir apenas chunks `message`.
 
-Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente.
+Essa correção evita confundir URL incorreta, Chatflow não publicado e workflow publicado que falhou internamente. Falhas transitórias do provider, como HTTP 429/5xx ou mensagens de alta demanda, recebem até `DIFY_MAX_RETRIES` novas tentativas com backoff; erros permanentes não são repetidos e uma resposta parcial nunca é duplicada.
 
 #### Decisão sobre o LLM único de produção
 
@@ -264,7 +264,7 @@ LM Studio local continua marcado como local ou sem preço quando não há tarifa
 
 ```env
 GEMINI_API_KEY=sua-chave
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 GEMINI_FALLBACK_MODEL=gemini-flash-lite-latest
 GEMINI_TIMEOUT_SECONDS=120
 GEMINI_MAX_OUTPUT_TOKENS=5400
