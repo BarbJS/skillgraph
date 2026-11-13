@@ -151,7 +151,25 @@ A decisão de trocar somente os providers de produção, e não reescrever as ro
 
 O Dify local e o Dify Cloud são instâncias diferentes. O Chatflow e os vetores não são tratados como arquivos independentes que possam ser copiados sem validação. A Knowledge Base é recriada no Dify Cloud, os quatro documentos de `documents_rag/` são reenviados e reindexados, e o Chatflow é publicado novamente.
 
-A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial, Top K 3 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 3.1 Flash Lite gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
+A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial/híbrida, Top K 4 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 3.1 Flash Lite gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
+
+#### Ajuste de chunking e recuperação validado no Dify Cloud
+
+Durante a validação pública, a pergunta “Treinamentos online contam para a carga horária anual?” inicialmente recuperava trechos relacionados à tabela de carga horária por nível, mas não separava adequadamente a resposta do FAQ sobre cursos online. O modelo acabava misturando a regra geral de modalidades válidas com a regra específica de treinamentos com nota inferior a 7,0.
+
+A Knowledge Base foi recriada e reindexada com:
+
+- **Parent max characters:** 800, reduzido de 1024;
+- **Child max characters:** 375, reduzido de 512;
+- separação por seções/parágrafos para manter perguntas e respostas do FAQ no mesmo contexto, sem misturar a seção de aprovação com a seção de modalidades;
+- recuperação híbrida, combinando semântica e palavras-chave;
+- Top K 4;
+- limite de pontuação desativado inicialmente;
+- reranking mantido desativado até validar quota e relevância.
+
+A redução da granularidade foi necessária porque chunks maiores agrupavam duas evidências semanticamente próximas, mas logicamente diferentes: “cursos online valem horas” e “treinamentos com nota inferior a 7,0 não contam para a carga horária mínima”. Com chunks menores, o Dify recupera a seção correta do `faq_desenvolvimento.md` e reduz a transferência indevida de condições entre seções.
+
+Após a recriação da Knowledge Base, o teste passou a recuperar a evidência correta e responder de acordo com a pergunta. A resposta deve continuar distinguindo “vale horas” de “conta automaticamente para a carga horária mínima”; quando essa relação não estiver explícita na fonte, o sistema deve declarar a ausência e recomendar confirmação com o RH.
 
 #### Decisão sobre a API do Dify
 

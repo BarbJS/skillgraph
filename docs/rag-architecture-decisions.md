@@ -13,7 +13,7 @@ A decisão de usar o armazenamento vetorial nativo do Dify evita duplicar a recu
 
 ## Área técnica do desenvolvedor
 
-O perfil Desenvolvedor pode consultar a configuração e o comportamento do Chatflow principal por meio da área de observabilidade. Gestor e RH não precisam conhecer detalhes internos de chunking, embeddings ou armazenamento vetorial para utilizar o SkillGraph.
+A Knowledge Base cloud validada usa parent 800, child 375, recuperação híbrida, Top K 4 e sem threshold inicial. O perfil Desenvolvedor pode consultar a configuração e o comportamento do Chatflow principal por meio da área de observabilidade. Gestor e RH não precisam conhecer detalhes internos de chunking, embeddings ou armazenamento vetorial para utilizar o SkillGraph.
 
 A evolução do corpus deve ser avaliada no próprio Dify com perguntas fixas, conferência de fontes, latência e taxa de ausência de evidência antes de promover mudanças ao fluxo publicado.
 
