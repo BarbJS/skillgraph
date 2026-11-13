@@ -56,6 +56,7 @@ data_bd/dataset_ml.csv
 .ml_artifacts/
 # The validated deployment artifact is intentionally versioned for Streamlit Cloud.
 !.ml_artifacts/
+.ml_artifacts/*
 !.ml_artifacts/skillgraph_competency_tracks.pkl
 # Legacy productivity model is invalid for the competency workflow.
 .ml_artifacts/skillgraph_productivity.pkl
