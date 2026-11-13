@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 from src.agents.router import AgentRoute, route_turn
 from src.agents.runtime import run_agent_turn
 from src.error_ui import render_error_panel
+from src.gemini_synthesizer import GeminiSynthesisError
 from src.ml_assistant import MLAssistantError
 from src.monitoring import record_event
 from src.observability import OBSERVABILITY, TraceContext
