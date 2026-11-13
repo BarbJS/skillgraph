@@ -458,7 +458,12 @@ def _render_ml_page() -> None:
     )
     from src.ml_inference import ARTIFACT_NAME
 
-    artifact_path = PROJECT_ROOT / ".ml_artifacts" / ARTIFACT_NAME
+    artifact_path = Path(
+        os.getenv(
+            "SKILLGRAPH_ML_ARTIFACT",
+            str(PROJECT_ROOT / ".ml_artifacts" / ARTIFACT_NAME),
+        )
+    )
     if not artifact_path.exists():
         st.warning(
             "O modelo de competências ainda não foi preparado. Solicite ao administrador a execução do pipeline da Etapa 2."

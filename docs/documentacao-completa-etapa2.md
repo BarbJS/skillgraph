@@ -12,7 +12,7 @@ A pessoa usuária da área ML não descreve o próprio perfil necessariamente. O
 
 ## 2. Escopo e arquitetura da Etapa 2
 
-A Etapa 2 adiciona uma área própria ao Streamlit, disponível aos três perfis simulados: desenvolvedor, gestor e RH.
+A Etapa 2 adiciona uma área própria ao Streamlit, disponível aos três perfis simulados: desenvolvedor, gestor e RH. O artefato de inferência validado é empacotado no deploy para que essa área funcione sem treinar o modelo durante uma pergunta.
 
 ```text
 Analista/gestor descreve um colaborador sem PII
@@ -66,7 +66,7 @@ A base de treinamento é exclusivamente o **O*NET 31.0 Database**, mantido pelo 
 
 O O*NET descreve ocupações, habilidades, conhecimentos e competências profissionais. Ele não contém históricos individuais dos colaboradores da NexaTech. O treinamento usa somente referências ocupacionais públicas.
 
-Os arquivos baixados ficam em `.ml_artifacts/onet/`, ignorado pelo Git. O artefato e o relatório ficam em `.ml_artifacts/` e também não são publicados.
+Os arquivos brutos baixados ficam em `.ml_artifacts/onet/`, ignorado pelo Git. O artefato validado `skillgraph_competency_tracks.pkl` é uma exceção versionada para o deploy; relatórios, datasets intermediários e demais artefatos continuam fora do repositório.
 
 ### Transformação da fonte
 

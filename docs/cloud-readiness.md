@@ -57,7 +57,7 @@ Esses caminhos são adequados para iniciar o processo, mas não são persistênc
 
 ## Artefato ML
 
-O app inicia sem `.ml_artifacts/skillgraph_competency_tracks.pkl`, mas a área Machine Learning informará que o modelo não foi preparado. Para habilitar ML no deploy, forneça o artefato por um mecanismo de build/storage apropriado e configure `SKILLGRAPH_ML_ARTIFACT` quando ele estiver fora do caminho padrão.
+O artefato validado `.ml_artifacts/skillgraph_competency_tracks.pkl` é versionado para habilitar a área Machine Learning no Streamlit Cloud. O arquivo contém somente o modelo de inferência, pré-processador, perfis agregados, metadados O*NET e métricas; não contém dados pessoais. O app também aceita `SKILLGRAPH_ML_ARTIFACT` para apontar para um artefato externo quando necessário.
 
 ## Health check
 
