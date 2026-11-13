@@ -33,7 +33,7 @@ from src.observability import OBSERVABILITY, TraceContext
 from src.output_security import validate_user_output
 from src.privacy_ui import upload_privacy_notice
 from src.progress_ui import ResumeProgress
-from src.reasoning import route_steps
+from src.reasoning import legacy_route_steps, route_steps
 from src.response_synthesis import synthesize_response
 from src.resume_extractor import ResumeExtractionError
 from src.resume_upload import extract_uploaded_resume
@@ -1277,6 +1277,8 @@ if question or uploaded_files:
         answer, sources, tools, table_rows, chart_frame = "", [], [], None, None
         agent_handled = False
         answer_already_synthesized = False
+        synthesis_metadata: dict[str, Any] = {}
+        reasoning_steps: list[dict[str, Any]] = []
         try:
             if use_agent_runtime:
                 progress.info("Executando o fluxo multiagente…")
@@ -1423,7 +1425,13 @@ if question or uploaded_files:
             st.stop()
 
         if not use_agent_runtime:
-            reasoning_steps = route_steps(route.intent.value)
+            reasoning_steps = legacy_route_steps(
+                route.intent.value,
+                question=question,
+                rows=table_rows or [],
+                sources=sources,
+                tools=tools,
+            )
         if route.intent not in {Intent.SMALLTALK} and not answer_already_synthesized:
             try:
                 answer, synthesis_metadata = synthesize_response(
@@ -1438,6 +1446,15 @@ if question or uploaded_files:
                     table_rows=table_rows,
                     trace=trace,
                 )
+                if not use_agent_runtime:
+                    reasoning_steps = legacy_route_steps(
+                        route.intent.value,
+                        question=question,
+                        rows=table_rows or [],
+                        sources=sources,
+                        tools=tools,
+                        synthesis=synthesis_metadata,
+                    )
             except GeminiSynthesisError as exc:
                 progress.empty()
                 st.error(
