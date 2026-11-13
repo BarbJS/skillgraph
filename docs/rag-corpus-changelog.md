@@ -33,7 +33,7 @@ O corpus utilizado pelo RAG está em `documents_rag/`; os materiais orientativos
 ## Decisões para a indexação
 
 - Indexar os quatro documentos como documentos separados para preservar as fontes nas respostas.
-- Usar o modelo de embedding local `text-embedding-nomic-embed-text-v1.5`, com 768 dimensões.
+- Usar o modelo de embedding Gemini `gemini-embedding-001` no deployment cloud; reindexar a Knowledge Base ao trocar o provider.
 - Começar com indexação de alta qualidade e recuperação vetorial.
 - Registrar no experimento o tamanho de chunk, overlap, Top K e threshold utilizados.
 - Não indexar CSVs, scripts, prompts internos ou PDFs de planejamento como conhecimento corporativo do usuário.

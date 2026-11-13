@@ -27,7 +27,7 @@ class Session:
 def test_gemini_defaults_to_current_flash_model(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
     client = GeminiSynthesizer(enabled=False, api_key="key", session=Session())
-    assert client.model == "gemini-3.8-flash"
+    assert client.model == "gemini-3.1-flash-lite"
 
 
 def test_gemini_defaults_to_one_attempt_without_fallback(monkeypatch):

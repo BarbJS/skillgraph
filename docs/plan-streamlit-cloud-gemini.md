@@ -8,7 +8,7 @@ Publicar uma versão pública e funcional do SkillGraph no Streamlit Community C
 - O Streamlit será o único app publicado diretamente.
 - Dify Cloud terá uma nova Knowledge Base e Chatflow.
 - Os documentos de `documents_rag/` serão reprocessados no Dify Cloud.
-- O modelo de chat será Gemini (`gemini-3.8-flash`), tanto no nó LLM do Chatflow Dify Cloud quanto na síntese final do aplicativo, quando habilitada.
+- O modelo de chat será Gemini (`gemini-3.1-flash-lite`), tanto no nó LLM do Chatflow Dify Cloud quanto na síntese final do aplicativo, quando habilitada.
 - O modelo de embeddings será um provider Google/Gemini disponível no Dify Cloud; se o modelo desejado não aparecer, escolher um provider compatível e documentar a decisão.
 - LM Studio fica fora da primeira publicação cloud.
 - CrewAI começa desativado até validarmos a compatibilidade do Gemini com CrewAI e seus prompts/tools.
@@ -17,7 +17,7 @@ Publicar uma versão pública e funcional do SkillGraph no Streamlit Community C
 ## Sequência
 
 1. **Validar Dify Cloud**
-   - Criar/configurar provider Gemini com o modelo `gemini-3.8-flash`.
+   - Criar/configurar provider Gemini com o modelo `gemini-3.1-flash-lite`.
    - Criar Knowledge Base.
    - Reenviar os quatro documentos do corpus.
    - Configurar parent/child chunking conforme `config/dify-chatflow-reference.json`.
@@ -27,7 +27,7 @@ Publicar uma versão pública e funcional do SkillGraph no Streamlit Community C
 
 2. **Validar Gemini como LLM único**
    - Testar geração no Dify.
-   - Configurar `GEMINI_API_KEY` e `GEMINI_MODEL=gemini-3.8-flash` para síntese final do SkillGraph.
+   - Configurar `GEMINI_API_KEY` e `GEMINI_MODEL=gemini-3.1-flash-lite` para síntese final do SkillGraph.
    - Fazer um teste separado de CrewAI com Gemini, sem ativá-lo publicamente ainda.
    - Se CrewAI exigir parâmetros/modelo incompatíveis, manter CrewAI desativado e registrar como próximo passo.
 

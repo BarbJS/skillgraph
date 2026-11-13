@@ -15,7 +15,7 @@ def _llm():
     from crewai import LLM
 
     return LLM(
-        model=os.getenv("CREWAI_LLM_MODEL", "openai/meta-llama-3-8b-instruct"),
+        model=os.getenv("CREWAI_LLM_MODEL", "gemini/gemini-3.1-flash-lite"),
         base_url=os.getenv("CREWAI_LLM_BASE_URL", "http://127.0.0.1:1234/v1"),
         api_key=os.getenv("CREWAI_LLM_API_KEY", "lm-studio-local"),
         temperature=0,

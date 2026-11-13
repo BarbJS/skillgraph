@@ -9,8 +9,8 @@ load_config
 require_command curl
 require_command jq
 
-CHAT_MODEL="${LM_STUDIO_CHAT_MODEL:-meta-llama-3-8b-instruct}"
-EMBEDDING_MODEL="${LM_STUDIO_EMBEDDING_MODEL:-text-embedding-nomic-embed-text-v1.5}"
+CHAT_MODEL="${LM_STUDIO_CHAT_MODEL:-gemini-3.1-flash-lite}"
+EMBEDDING_MODEL="${LM_STUDIO_EMBEDDING_MODEL:-gemini-embedding-001}"
 BASE_URL="http://${LM_STUDIO_HOST}:${LM_STUDIO_PORT}/v1"
 API_KEY="${LM_STUDIO_API_KEY:-lm-studio-local}"
 

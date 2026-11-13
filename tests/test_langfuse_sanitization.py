@@ -126,13 +126,13 @@ def test_langfuse_generation_payload_uses_usage_and_cost():
         "gemini.final_synthesis",
         "gemini",
         task_name="final_synthesis",
-        metadata={"observation_type": "generation", "model": "gemini-3.8-flash"},
+        metadata={"observation_type": "generation", "model": "gemini-3.1-flash-lite"},
     ) as span:
         span.set_usage(input_tokens=10, output_tokens=6, cost=0.000022)
     trace.finish()
     store._send_langfuse(trace)
     generation = next(item["generation"] for item in store._langfuse.root.calls if "generation" in item)
-    assert generation["model"] == "gemini-3.8-flash"
+    assert generation["model"] == "gemini-3.1-flash-lite"
     assert generation["usage_details"] == {"input": 10, "output": 6, "total": 16}
     assert generation["cost_details"] == {"total": 0.000022}
 

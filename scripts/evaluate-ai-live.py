@@ -41,7 +41,7 @@ def main() -> None:
         case_id=args.deepeval_case,
         progress=lambda case_id, index, total: print(f"[{index}/{total}] {case_id}", flush=True),
     )
-    report["judge_model"] = args.judge_model or os.getenv("EVAL_JUDGE_MODEL", "meta-llama-3-8b-instruct")
+    report["judge_model"] = args.judge_model or os.getenv("EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite")
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
 

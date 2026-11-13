@@ -50,7 +50,7 @@ def extract_profile(resume_text: str, jev_result: dict[str, Any]) -> EmployeePro
     )
     model = os.getenv(
         "RESUME_PROFILE_MODEL",
-        os.getenv("LM_STUDIO_CHAT_MODEL", "meta-llama-3-8b-instruct"),
+        os.getenv("LM_STUDIO_CHAT_MODEL", "gemini-3.1-flash-lite"),
     )
     api_key = os.getenv(
         "RESUME_PROFILE_API_KEY", os.getenv("LM_STUDIO_API_KEY", "lm-studio-local")

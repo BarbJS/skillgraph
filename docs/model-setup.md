@@ -32,7 +32,7 @@ Se **LM Studio** não aparecer no Marketplace, use a alternativa **OpenAI-API-co
 1. Abra `http://localhost` e faça login no workspace.
 2. Acesse **Integrações → Fornecedor de modelo → LM Studio → Adicionar modelo**.
 3. Selecione o tipo **LLM/Chat** e informe:
-   - **Model Name/ID**: `meta-llama-3-8b-instruct`;
+   - **Model Name/ID**: `gemini-3.1-flash-lite`;
    - **Base URL**: `http://host.docker.internal:1234` — neste plugin dedicado, **não acrescente `/v1`**, pois o plugin acrescenta `/v1` internamente;
    - **API Key**: `lm-studio-local`;
    - **Completion mode**: `Chat`;
@@ -59,7 +59,7 @@ curl --fail http://127.0.0.1:1234/v1/embeddings \
 
 Substitua `SEU_ID_DE_EMBEDDING` pelo ID real. O resultado precisa conter um vetor numérico em `data[0].embedding`. Um modelo de chat que responde a `/v1/chat/completions` não é automaticamente um modelo de embedding.
 
-Nesta máquina, o teste foi bem-sucedido com `text-embedding-nomic-embed-text-v1.5`, que retornou um vetor de 768 dimensões. O modelo de chat disponível é `meta-llama-3-8b-instruct`. Os IDs podem mudar em outra instalação; sempre confira `make check`.
+No deployment atual, o chat usa `gemini-3.1-flash-lite` e os embeddings usam `gemini-embedding-001`. Os IDs podem mudar conforme o provider; confirme sempre no painel do Dify antes de publicar.
 
 No Dify, cadastre esse ID como **Text Embedding/Embedding** no provider compatível e teste antes de criar uma Knowledge Base. Se não houver suporte confiável a embeddings no LM Studio, escolha um provider de embedding local compatível com o Dify para essa parte; mantenha o chat no LM Studio e registre a decisão no projeto.
 

@@ -3,9 +3,9 @@
   "app_type": "chatflow",
   "published": true,
   "rag_backend_reference": "Dify Chatflow with its managed vector store (Weaviate in this local deployment); this is the only RAG backend",
-  "local_llm_provider": "LM Studio",
-  "chat_model": "meta-llama-3-8b-instruct",
-  "embedding_model": "text-embedding-nomic-embed-text-v1.5",
+  "llm_provider": "Google Gemini",
+  "chat_model": "gemini-3.1-flash-lite",
+  "embedding_model": "gemini-embedding-001",
   "knowledge_base": "SkillGraph - v1.2",
   "retrieval": {
     "mode": "parent-child",
@@ -26,5 +26,5 @@
     "answer"
   ],
   "system_prompt_reference": "../docs/system-prompt.md",
-  "secrets": "API keys are intentionally omitted. Configure them only in the local .env file."
+  "secrets": "API keys are intentionally omitted. Configure them only in the deployment secret store."
 }

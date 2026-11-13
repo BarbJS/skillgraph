@@ -51,12 +51,8 @@ class GeminiSynthesizer:
     ) -> None:
         self.enabled = True if enabled is None else enabled
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
-        configured_model = model or os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-        self.model = (
-            "gemini-3.8-flash"
-            if configured_model.strip() == "gemini-2.5-flash"
-            else configured_model.strip()
-        )
+        configured_model = model or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+        self.model = configured_model.strip()
         self.allow_fallback = self._env_bool("GEMINI_ALLOW_FALLBACK", False)
         self.max_attempts = self._positive_int(
             os.getenv("GEMINI_MAX_ATTEMPTS", "1"),

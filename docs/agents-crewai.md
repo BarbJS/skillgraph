@@ -105,9 +105,9 @@ Variáveis:
 
 ```env
 CREWAI_ENABLED=true
-CREWAI_LLM_MODEL=openai/meta-llama-3-8b-instruct
-CREWAI_LLM_BASE_URL=http://127.0.0.1:1234/v1
-CREWAI_LLM_API_KEY=lm-studio-local
+CREWAI_LLM_MODEL=gemini/gemini-3.1-flash-lite
+CREWAI_LLM_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+CREWAI_LLM_API_KEY=sua-chave-gemini
 CREWAI_PROCESS=sequential
 ```
 

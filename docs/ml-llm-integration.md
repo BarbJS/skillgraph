@@ -5,7 +5,7 @@ A aba Machine Learning atende analistas e gestores de RH que descrevem um **cola
 ```text
 Descrição não identificadora do colaborador
   ↓
-LM Studio extrai competências e níveis em JSON
+Gemini 3.1 Flash Lite interpreta competências e níveis em JSON
   ↓
 backend valida/normaliza o perfil
   ↓
@@ -13,7 +13,7 @@ backend carrega skillgraph_competency_tracks.pkl
   ↓
 backend calcula trilhas Top-3 e prioridades
   ↓
-LM Studio explica o resultado real
+Gemini 3.1 Flash Lite explica o resultado real
 ```
 
 O LLM não treina, não abre o PKL, não consulta DuckDB/Dify e não inventa competências. O resultado é uma recomendação de desenvolvimento baseada em referências O*NET e exige revisão humana.
@@ -28,4 +28,4 @@ Perguntas adequadas:
 
 A resposta deve conter trilhas compatíveis, competências reconhecidas, competências não reconhecidas, prioridades de desenvolvimento e uma indicação simples de incerteza quando as trilhas estiverem próximas. SHAP e gráficos técnicos ficam restritos ao perfil desenvolvedor; o LLM recebe apenas o JSON calculado pelo backend.
 
-Não é necessário alterar o system prompt do Chatflow Dify. A rota ML usa o LM Studio local diretamente e permanece separada do RAG e do DuckDB.
+Não é necessário alterar o system prompt do Chatflow Dify. A rota ML usa o Gemini 3.1 Flash Lite na interpretação/explicação e permanece separada do RAG e do DuckDB.

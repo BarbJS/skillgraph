@@ -587,7 +587,7 @@ O CrewAI e os agentes continuam usando o LM Studio local. Se a demonstração pr
 
 ```env
 GEMINI_API_KEY=sua-chave-local
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-3.1-flash-lite
 GEMINI_MAX_ATTEMPTS=1
 GEMINI_ALLOW_FALLBACK=false
 ```

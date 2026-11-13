@@ -31,7 +31,7 @@ O log não registra API keys, prompts completos, respostas completas ou texto de
 ## Rotas observadas
 
 ```text
-RAG → API do Dify → Chatflow → Weaviate → LM Studio
+RAG → API do Dify → Chatflow → Weaviate → Gemini 3.1 Flash Lite
 SQL → função read-only allowlisted → DuckDB
 blocked → guardrail, sem ferramenta/LLM
 ```

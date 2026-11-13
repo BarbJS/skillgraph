@@ -144,7 +144,7 @@ class LocalMLAssistant:
         host = os.getenv("LM_STUDIO_HOST", "127.0.0.1")
         port = os.getenv("LM_STUDIO_PORT", "1234")
         self.base_url = (base_url or f"http://{host}:{port}/v1").rstrip("/")
-        self.model = model or os.getenv("LM_STUDIO_CHAT_MODEL", "meta-llama-3-8b-instruct")
+        self.model = model or os.getenv("LM_STUDIO_CHAT_MODEL", "gemini-3.1-flash-lite")
         self.api_key = api_key or os.getenv("LM_STUDIO_API_KEY", "lm-studio-local")
         self.artifact_path = artifact_path
         self.session = session or requests.Session()

@@ -69,8 +69,8 @@ Scores por caso registrados no relatório live:
 | `rag-gold-011` | 1,0000 | 1,0000 | 1,0000 | 1,0000 | 1,0000 |
 | `rag-gold-012` | 0,7500 | 0,7500 | 1,0000 | 1,0000 | 0,8750 |
 
-O judge registrado foi `meta-llama-3-8b-instruct`, com 12 casos avaliados e 12 aprovados.
-O relatório detalhado está em `output/evaluation/live_ai_report.json` e registra o judge `meta-llama-3-8b-instruct`, o dataset, cada caso, cada métrica, razões do judge e recomendações.
+O judge registrado foi `gemini-3.1-flash-lite`, com 12 casos avaliados e 12 aprovados.
+O relatório detalhado está em `output/evaluation/live_ai_report.json` e registra o judge `gemini-3.1-flash-lite`, o dataset, cada caso, cada métrica, razões do judge e recomendações.
 
 ## 6. Conclusão
 

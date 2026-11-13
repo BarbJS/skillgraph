@@ -22,7 +22,7 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
         api_key: str | None = None,
     ) -> None:
         self.model_name = model or os.getenv(
-            "EVAL_JUDGE_MODEL", "meta-llama-3-8b-instruct"
+            "EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite"
         )
         self.base_url = base_url or os.getenv(
             "EVAL_JUDGE_BASE_URL", "http://127.0.0.1:1234/v1"

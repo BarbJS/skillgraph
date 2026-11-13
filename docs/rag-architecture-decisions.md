@@ -2,7 +2,7 @@
 
 ## Dify e Weaviate
 
-O SkillGraph utiliza um único caminho de RAG: **Dify Chatflow + armazenamento vetorial gerenciado pelo Dify (Weaviate nesta instalação local) + LM Studio**.
+O SkillGraph utiliza um único caminho de RAG: **Dify Chatflow + armazenamento vetorial gerenciado pelo Dify (Weaviate) + Gemini 3.1 Flash Lite**, com `gemini-embedding-001` para embeddings.
 
 - **Dify:** orquestração visual, Chatflow publicado, recuperação e API.
 - **Weaviate:** armazenamento vetorial usado internamente pelo Dify para recuperar os trechos relevantes.
