@@ -143,14 +143,46 @@ class LocalMLAssistant:
     ) -> None:
         host = os.getenv("LM_STUDIO_HOST", "127.0.0.1")
         port = os.getenv("LM_STUDIO_PORT", "1234")
-        self.base_url = (base_url or f"http://{host}:{port}/v1").rstrip("/")
-        self.model = model or os.getenv("LM_STUDIO_CHAT_MODEL", "gemini-3.1-flash-lite")
-        self.api_key = api_key or os.getenv("LM_STUDIO_API_KEY", "lm-studio-local")
+        self.base_url = (base_url or os.getenv("ML_INTERPRETER_BASE_URL") or f"http://{host}:{port}/v1").rstrip("/")
+        self.model = model or os.getenv("ML_INTERPRETER_MODEL") or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+        self.api_key = api_key or os.getenv("ML_INTERPRETER_API_KEY") or os.getenv("GEMINI_API_KEY", "")
         self.artifact_path = artifact_path
         self.session = session or requests.Session()
         self.artifact = artifact
+        self.provider = os.getenv("ML_INTERPRETER_PROVIDER", "openai_compatible").strip().casefold()
+        self._gemini_endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def _gemini_completion(self, messages: list[dict[str, str]], json_mode: bool = False) -> str:
+        if not self.api_key:
+            raise MLAssistantError("GEMINI_API_KEY não configurada para a interpretação ML.")
+        system = next((item["content"] for item in messages if item.get("role") == "system"), "")
+        user = next((item["content"] for item in messages if item.get("role") == "user"), "")
+        body = {
+            "systemInstruction": {"parts": [{"text": system}]},
+            "contents": [{"role": "user", "parts": [{"text": user}]}],
+            "generationConfig": {
+                "temperature": 0,
+                "maxOutputTokens": 600,
+                **({"responseMimeType": "application/json"} if json_mode else {}),
+            },
+        }
+        try:
+            response = self.session.post(
+                f"{self._gemini_endpoint}/{self.model}:generateContent",
+                params={"key": self.api_key},
+                headers={"Content-Type": "application/json"},
+                json=body,
+                timeout=(5, 60),
+            )
+            response.raise_for_status()
+            parts = response.json()["candidates"][0]["content"]["parts"]
+            return "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
+        except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise MLAssistantError("Não foi possível consultar o Gemini para interpretar o perfil ML.") from exc
 
     def _completion(self, messages: list[dict[str, str]], json_mode: bool = False) -> str:
+        if self.provider == "gemini":
+            return self._gemini_completion(messages, json_mode)
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,

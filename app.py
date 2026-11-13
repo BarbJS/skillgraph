@@ -557,8 +557,8 @@ def _render_ml_page() -> None:
                 ml_trace.finish("error", str(exc))
                 OBSERVABILITY.record(ml_trace)
                 st.error(
-                    "Não foi possível gerar a resposta final. "
-                    "Verifique a configuração do Gemini e tente novamente."
+                    "Não foi possível concluir a recomendação de Machine Learning. "
+                    f"Detalhe seguro: {exc}"
                 )
                 st.session_state["ml_messages"].append(
                     {"role": "assistant", "content": "A resposta final não foi gerada."}
