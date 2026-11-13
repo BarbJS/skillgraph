@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from src.agents.crew import CrewAIUnavailable, build_route_crew
 from src.agents.guardrails import AgentGuardrailError, validate_agent_input
@@ -103,15 +103,26 @@ def run_agent_turn(
         if route == AgentRoute.RAG:
             dify = DifyClient.from_environment(trace=trace)
 
+        prediction_cache: str | None = None
+
         def prediction_tool(profile_json: str) -> str:
-            """Run the persisted competency PKL for a validated profile."""
+            """Run the persisted competency PKL exactly once for a validated profile."""
+            nonlocal prediction_cache
+            if prediction_cache is not None:
+                return prediction_cache
             profile = json.loads(profile_json)
-            skills = {
-                item.get("normalized_name")
-                or item["name"]: float(item.get("level") or 0)
-                for item in profile.get("skills", [])
-            }
-            return json.dumps(
+            raw_skills = profile.get("skills", {})
+            if isinstance(raw_skills, Mapping):
+                skills = {
+                    str(name): float(level)
+                    for name, level in raw_skills.items()
+                }
+            else:
+                skills = {
+                    item.get("normalized_name") or item["name"]: float(item.get("level") or 0)
+                    for item in raw_skills
+                }
+            prediction_cache = json.dumps(
                 _trace_tool(
                     "tool.competency_recommendation",
                     "ml",
@@ -119,6 +130,15 @@ def run_agent_turn(
                     lambda: competency_recommendation_tool(artifact_path, skills),
                 ),
                 ensure_ascii=False,
+            )
+            return prediction_cache
+
+        prediction_result: dict[str, Any] | None = None
+        if route == AgentRoute.ML:
+            if not ml_profile:
+                raise RuntimeError("A rota de Machine Learning exige um perfil estruturado.")
+            prediction_result = json.loads(
+                prediction_tool(json.dumps(ml_profile, ensure_ascii=False))
             )
 
         def training_tool(competency: str = "") -> str:
@@ -173,8 +193,6 @@ def run_agent_turn(
             "CompetencyGapTool": competency_gap_tool,
             "DifyRagTool": rag_tool,
         }
-        if route == AgentRoute.ML and not ml_profile:
-            raise RuntimeError("A rota de Machine Learning exige um perfil estruturado.")
         jev_result = {}
         resume_profile = None
         redacted_resume_text = ""
@@ -234,23 +252,27 @@ def run_agent_turn(
                     rag_payload = candidate
             if rag_payload.get("answer"):
                 local_answer = str(rag_payload["answer"])
+        structured_context = {
+            "profile_rendered": render_profile(resume_profile)
+            if resume_profile
+            else "",
+            "profile": resume_profile.model_dump(mode="json") if resume_profile else None,
+            "rag_answer": rag_payload.get("answer", ""),
+            "rag_sources": rag_payload.get("sources", []),
+            "prediction": prediction_result,
+            "ml_profile": ml_profile,
+            "state": sanitize(state),
+        }
         final_answer, synthesis = synthesize_response(
             route.value,
             local_answer,
-            structured_context={
-                "profile_rendered": render_profile(resume_profile)
-                if resume_profile
-                else "",
-                "profile": resume_profile.model_dump(mode="json")
-                if resume_profile
-                else None,
-                "rag_answer": rag_payload.get("answer", ""),
-                "rag_sources": rag_payload.get("sources", []),
-                "state": sanitize(state),
-            },
+            structured_context=structured_context,
             sources=rag_payload.get("sources", []),
             trace=trace,
         )
+        if route == AgentRoute.ML and prediction_result:
+            final_answer = str(final_answer)
+
         synthesis["fallback"] = False
         synthesis["provider"] = "gemini"
         return {
@@ -258,8 +280,9 @@ def run_agent_turn(
             "route": route.value,
             "answer": final_answer,
             "profile": (
-                resume_profile.model_dump(mode="json") if resume_profile else None
+                resume_profile.model_dump(mode="json") if resume_profile else ml_profile
             ),
+            "structured": prediction_result,
             "reasoning": sanitize_steps(reasoning_steps),
             "synthesis": {key: value for key, value in synthesis.items() if key != "error"},
             "state_patch": {"last_route": route.value},
