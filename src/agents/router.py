@@ -47,7 +47,21 @@ def route_turn(message: str, *, has_resume: bool = False) -> AgentRoute:
         return AgentRoute.STRUCTURED
     if any(
         term in normalized
-        for term in ("política", "politica", "reembolso", "elegibilidade")
+        for term in (
+            "política",
+            "politica",
+            "reembolso",
+            "elegibilidade",
+            "carga horária",
+            "carga horaria",
+            "prazo para",
+            "contam para",
+            "conta para",
+            "vale horas",
+            "valem horas",
+            "horário de trabalho",
+            "horario de trabalho",
+        )
     ):
         return AgentRoute.RAG
     if any(

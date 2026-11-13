@@ -9,6 +9,19 @@ def test_training_policy_and_gap_messages_use_agent_routes():
     assert route_turn("Quais competências têm mais lacunas?") is AgentRoute.STRUCTURED
 
 
+def test_documentary_training_rules_use_general_rag_specialist():
+    assert (
+        route_turn("Treinamentos online contam para a carga horária anual?")
+        is AgentRoute.RAG
+    )
+    assert route_turn("Qual é o prazo para concluir um treinamento obrigatório?") is AgentRoute.RAG
+
+
+def test_training_catalog_questions_use_training_specialist():
+    assert route_turn("Quais treinamentos estão disponíveis?") is AgentRoute.TRAINING
+    assert route_turn("Quais cursos existem no catálogo?") is AgentRoute.TRAINING
+
+
 def test_runtime_structured_route_wires_gap_tool(monkeypatch):
     monkeypatch.setenv("CREWAI_ENABLED", "true")
     monkeypatch.setattr(
