@@ -209,17 +209,39 @@ def _migrate_conversation_title(conversation: dict[str, Any]) -> None:
             store.rename_conversation(conversation["id"], new_title, role=role)
 
 
+def _new_conversation(role: str, *, title: str = "Nova conversa", backend: str = "crewai") -> str:
+    """Create and immediately activate an empty conversation for the selected role."""
+    conversation_id = store.create_conversation(title, backend, role=role)
+    st.session_state.active_conversation_id = conversation_id
+    st.session_state.conversation_id = ""
+    st.session_state.pop("pending_prompt", None)
+    st.session_state.pop("pending_prompt_value", None)
+    st.session_state.pop("pending_resume", None)
+    st.session_state.pop("pending_resume_question", None)
+    st.session_state.pop("ml_explainability_payload", None)
+    st.session_state.pop("ml_messages", None)
+    return conversation_id
+
+
 def _ensure_resume_conversation(question: str, role: str) -> str:
     """Create/select a conversation with the explicit resume-analysis title."""
     conversation_id = st.session_state.get("active_conversation_id")
-    if not conversation_id:
-        conversation_id = store.create_conversation(
-            "Análise de currículo", "crewai", role=role
-        )
-        st.session_state.active_conversation_id = conversation_id
+    active = store.get_conversation(conversation_id, role=role) if conversation_id else None
+    if not active:
+        conversation_id = _new_conversation(role, title="Análise de currículo", backend="crewai")
     else:
         store.set_title(conversation_id, "Análise de currículo", role=role)
     return conversation_id
+
+
+def _active_conversation(role: str) -> dict[str, Any] | None:
+    conversation_id = st.session_state.get("active_conversation_id")
+    if not conversation_id:
+        return None
+    return store.get_conversation(conversation_id, role=role)
+
+
+# Conversation-specific state is intentionally loaded from SessionStore after reruns.
 
 
 def _render_feedback(message: dict[str, Any]) -> None:
@@ -469,18 +491,34 @@ def _render_ml_page() -> None:
         "Descreva o colaborador sem nome, CPF, e-mail ou outros identificadores. Ex.: colaborador da equipe de dados."
     )
     assistant = LocalMLAssistant(artifact_path, artifact=artifact)
-    for message in st.session_state.get("ml_messages", []):
+    active_id = st.session_state.get("active_conversation_id")
+    persisted_messages = store.messages(active_id, role=role) if active_id else []
+    for message in persisted_messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+    # Keep the legacy session list empty; the store is the source of truth.
+    st.session_state.pop("ml_messages", None)
+
     ml_question = st.chat_input(
         "Ex.: o colaborador tem Python avançado, SQL intermediário e está começando em IA generativa. Qual trilha priorizar?",
         key="ml-chat-input",
     )
     if ml_question:
-        st.session_state.setdefault("ml_messages", []).append(
-            {"role": "user", "content": ml_question}
+        ml_conversation_id = st.session_state.get("active_conversation_id")
+        if not ml_conversation_id or not store.get_conversation(ml_conversation_id, role=role):
+            ml_conversation_id = _new_conversation(role, title="Recomendação de trilhas de competências", backend="crewai")
+        store.add_message(
+            ml_conversation_id,
+            "user",
+            ml_question,
+            route="ml_prediction",
+            request_id=str(uuid.uuid4()),
+            conversation_role=role,
         )
         with st.chat_message("user"):
+            st.markdown(ml_question)
+        with st.chat_message("assistant"):
+
             st.markdown(ml_question)
         with st.chat_message("assistant"):
             ml_trace = TraceContext(
@@ -519,8 +557,13 @@ def _render_ml_page() -> None:
                         "A resposta da recomendação foi bloqueada pela validação de segurança. "
                         "Tente reformular a solicitação sem dados pessoais ou decisões de RH."
                     )
-                    st.session_state["ml_messages"].append(
-                        {"role": "assistant", "content": "A resposta final foi bloqueada pela validação de segurança."}
+                    store.add_message(
+                        ml_conversation_id,
+                        "assistant",
+                        "A resposta final foi bloqueada pela validação de segurança.",
+                        route="ml_prediction",
+                        request_id=ml_trace.trace_id,
+                        conversation_role=role,
                     )
                     st.stop()
                 st.markdown(final_answer)
@@ -544,8 +587,14 @@ def _render_ml_page() -> None:
                         artifact,
                         st.session_state["ml_explainability_payload"],
                     )
-                st.session_state["ml_messages"].append(
-                    {"role": "assistant", "content": final_answer}
+                store.add_message(
+                    ml_conversation_id,
+                    "assistant",
+                    final_answer,
+                    route="ml_prediction",
+                    request_id=ml_trace.trace_id,
+                    reasoning=[],
+                    conversation_role=role,
                 )
             except (MLAssistantError, GeminiSynthesisError) as exc:
                 ml_trace.finish("error", str(exc))
@@ -697,10 +746,7 @@ def _render_sidebar(
             use_container_width=True,
             key="new-conversation-primary",
         ):
-            st.session_state.active_conversation_id = store.create_conversation(
-                "Nova conversa", "dify", role=role
-            )
-            st.session_state.conversation_id = ""
+            _new_conversation(role)
             st.rerun()
         conversation_search = st.text_input(
             "Buscar conversas",
@@ -817,20 +863,17 @@ if "conversation_id" not in st.session_state:
     st.session_state.conversation_id = ""
 
 role_conversations = store.list_conversations(role=role)
-if st.session_state.active_conversation_id not in {
-    item["id"] for item in role_conversations
-}:
-    st.session_state.active_conversation_id = (
-        role_conversations[0]["id"] if role_conversations else None
-    )
-    active = (
-        store.get_conversation(st.session_state.active_conversation_id, role=role)
-        if st.session_state.active_conversation_id
-        else None
-    )
-    st.session_state.conversation_id = (
-        active.get("dify_conversation_id", "") if active else ""
-    )
+active = _active_conversation(role)
+if active is None:
+    if role_conversations:
+        st.session_state.active_conversation_id = role_conversations[0]["id"]
+        active = role_conversations[0]
+    else:
+        st.session_state.active_conversation_id = None
+        active = None
+    st.session_state.conversation_id = active.get("dify_conversation_id", "") if active else ""
+else:
+    st.session_state.conversation_id = active.get("dify_conversation_id", "")
 
 if gestor_view == "Machine Learning":
     _render_ml_page()
