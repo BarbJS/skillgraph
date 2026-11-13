@@ -6,7 +6,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-from src.privacy import contains_employment_decision, redact_text
+from src.privacy import redact_text
 from src.toxicity import evaluate_toxicity
 
 
@@ -39,6 +39,14 @@ _SECRET_PATTERNS = (
 _INJECTION_OUTPUT = re.compile(
     r"(?i)(ignore (?:all|your|the) (?:previous )?(?:rules|instructions)|ignore previous instructions|system prompt|developer message|reveal (?:the )?prompt|reveal internal instructions|chain[- ]of[- ]thought)"
 )
+_EMPLOYMENT_DECISION = re.compile(
+    r"\b(?:contrat(?:ar|e|ação|acao|ado|ada)|demit(?:ir|a|ido|ida)|"
+    r"deslig(?:ar|amento|ado|ada)|promov(?:er|a|ido|ida|ção|cao)|"
+    r"reprovar|ranking de candidatos|sal[aá]rio individual|"
+    r"remunera[çc][aã]o individual|puni(?:r|ção|cao))\b",
+    re.IGNORECASE,
+)
+_NEGATION_MARKER = re.compile(r"\b(?:não|nao|nunca|sem)\b", re.IGNORECASE)
 
 
 def _normalized(text: str) -> str:
@@ -47,6 +55,22 @@ def _normalized(text: str) -> str:
 
 def _has_secret(text: str) -> bool:
     return any(pattern.search(text) for pattern in _SECRET_PATTERNS)
+
+
+def _has_employment_decision(text: str) -> bool:
+    """Reject affirmative employment decisions, but allow explicit disclaimers."""
+    candidates = list(_EMPLOYMENT_DECISION.finditer(text))
+    if not candidates:
+        return False
+    for match in candidates:
+        context = text[max(0, match.start() - 100):match.end()]
+        if not _NEGATION_MARKER.search(context):
+            return True
+        # A negation in the same clause is a governance disclaimer, not a decision.
+        clause = re.split(r"[.!?;]\s*", context)[-1]
+        if not _NEGATION_MARKER.search(clause):
+            return True
+    return False
 
 
 def scan_output(text: str, *, max_chars: int = 20000) -> OutputSecurityResult:
@@ -64,7 +88,7 @@ def scan_output(text: str, *, max_chars: int = 20000) -> OutputSecurityResult:
         categories.append("secret")
     if _INJECTION_OUTPUT.search(_normalized(value)):
         categories.append("prompt_leakage")
-    if contains_employment_decision(value):
+    if _has_employment_decision(value):
         categories.append("employment_decision")
     toxicity = evaluate_toxicity(value)
     if not toxicity.passed:

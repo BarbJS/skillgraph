@@ -23,7 +23,7 @@ from src.gemini_synthesizer import GeminiSynthesisError
 from src.ml_assistant import MLAssistantError
 from src.monitoring import record_event
 from src.observability import OBSERVABILITY, TraceContext
-from src.output_security import validate_user_output
+from src.output_security import OutputSecurityError, validate_user_output
 from src.privacy_ui import upload_privacy_notice
 from src.progress_ui import ResumeProgress
 from src.reasoning import route_steps
@@ -510,7 +510,19 @@ def _render_ml_page() -> None:
                         "priorities": agent_result.get("structured", {}).get("priorities", []),
                         "structured": agent_result.get("structured", {}),
                     })()
-                final_answer = validate_user_output(final_answer, route="ml_prediction")
+                try:
+                    final_answer = validate_user_output(final_answer, route="ml_prediction")
+                except OutputSecurityError as exc:
+                    ml_trace.finish("blocked", exc.category)
+                    OBSERVABILITY.record(ml_trace)
+                    st.error(
+                        "A resposta da recomendação foi bloqueada pela validação de segurança. "
+                        "Tente reformular a solicitação sem dados pessoais ou decisões de RH."
+                    )
+                    st.session_state["ml_messages"].append(
+                        {"role": "assistant", "content": "A resposta final foi bloqueada pela validação de segurança."}
+                    )
+                    st.stop()
                 st.markdown(final_answer)
                 ml_trace.finish("success")
                 OBSERVABILITY.record(ml_trace)
