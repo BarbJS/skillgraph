@@ -33,7 +33,7 @@ from src.observability import OBSERVABILITY, TraceContext
 from src.output_security import validate_user_output
 from src.privacy_ui import upload_privacy_notice
 from src.progress_ui import ResumeProgress
-from src.reasoning import legacy_route_steps, route_steps
+from src.reasoning import route_steps
 from src.response_synthesis import synthesize_response
 from src.resume_extractor import ResumeExtractionError
 from src.resume_upload import extract_uploaded_resume
@@ -1243,15 +1243,11 @@ if question or uploaded_files:
     conversation_id = st.session_state.active_conversation_id
     route = route_question(question)
     agent_route = route_turn(question)
-    use_agent_runtime = (
-        os.getenv("CREWAI_ENABLED", "false").casefold() == "true"
-        and agent_route.value in {
-            "training_recommendation",
-            "policy_rag",
-            "structured_data",
-        }
-        and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
-    )
+    use_agent_runtime = agent_route.value in {
+        "training_recommendation",
+        "policy_rag",
+        "structured_data",
+    } and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
     trace.route = agent_route.value if use_agent_runtime else route.intent.value
     store.add_message(
         conversation_id,
@@ -1311,10 +1307,8 @@ if question or uploaded_files:
                     agent_handled = True
                     answer_already_synthesized = True
                 elif agent_status == "disabled":
-                    use_agent_runtime = False
-                    trace.route = route.intent.value
-                    progress.info(
-                        "Fluxo multiagente indisponível; usando o fluxo compatível."
+                    raise DifyClientError(
+                        "O sistema multiagente é obrigatório e não está disponível."
                     )
                 elif agent_status == "error":
                     # Do not invoke Dify/Gemini a second time after a provider
@@ -1424,14 +1418,8 @@ if question or uploaded_files:
             )
             st.stop()
 
-        if not use_agent_runtime:
-            reasoning_steps = legacy_route_steps(
-                route.intent.value,
-                question=question,
-                rows=table_rows or [],
-                sources=sources,
-                tools=tools,
-            )
+        if not reasoning_steps:
+            reasoning_steps = route_steps(route.intent.value)
         if route.intent not in {Intent.SMALLTALK} and not answer_already_synthesized:
             try:
                 answer, synthesis_metadata = synthesize_response(
@@ -1446,15 +1434,6 @@ if question or uploaded_files:
                     table_rows=table_rows,
                     trace=trace,
                 )
-                if not use_agent_runtime:
-                    reasoning_steps = legacy_route_steps(
-                        route.intent.value,
-                        question=question,
-                        rows=table_rows or [],
-                        sources=sources,
-                        tools=tools,
-                        synthesis=synthesis_metadata,
-                    )
             except GeminiSynthesisError as exc:
                 progress.empty()
                 st.error(

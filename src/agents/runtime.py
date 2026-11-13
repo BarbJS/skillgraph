@@ -77,11 +77,12 @@ def run_agent_turn(
             "answer": "Descreva um colaborador, uma competência, uma trilha, um treinamento ou uma política que deseja consultar.",
             "state_patch": {},
         }
-    if os.getenv("CREWAI_ENABLED", "false").casefold() != "true":
+    if os.getenv("CREWAI_ENABLED", "true").casefold() != "true":
         return {
-            "status": "disabled",
+            "status": "error",
             "route": route.value,
-            "answer": "O fluxo multiagente está preparado, mas desativado neste ambiente.",
+            "answer": "O sistema multiagente é obrigatório; configure CREWAI_ENABLED=true.",
+            "error": "CREWAI_ENABLED deve ser true para executar a rota multiagente.",
             "state_patch": {"last_route": route.value},
         }
     try:
@@ -244,9 +245,10 @@ def run_agent_turn(
         }
     except CrewAIUnavailable as exc:
         return {
-            "status": "disabled",
+            "status": "error",
             "route": route.value,
-            "answer": str(exc),
+            "answer": f"O sistema multiagente não está disponível: {exc}",
+            "error": str(exc),
             "state_patch": {"last_route": route.value},
         }
     except Exception as exc:

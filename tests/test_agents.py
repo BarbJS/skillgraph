@@ -13,15 +13,14 @@ def test_agent_flow_context_is_json_serializable():
     assert context["employee_profile"]["skills"][0]["level"] == 4.0
 
 
-def test_crewai_is_disabled_by_default(monkeypatch):
-
-    monkeypatch.delenv("CREWAI_ENABLED", raising=False)
+def test_crewai_requires_explicit_runtime_when_disabled(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "false")
     try:
         build_skillgraph_crew()
     except CrewAIUnavailable as exc:
         assert "desativado" in str(exc)
     else:
-        raise AssertionError("CrewAI should be disabled by default")
+        raise AssertionError("CrewAI should reject a disabled configuration")
 
 
 def test_all_agent_prompts_exist():

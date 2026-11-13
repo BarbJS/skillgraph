@@ -36,11 +36,12 @@ def test_training_and_policy_roles_are_least_privilege():
     )
 
 
-def test_runtime_reports_disabled_route_without_calling_external_services(monkeypatch):
-    monkeypatch.delenv("CREWAI_ENABLED", raising=False)
+def test_runtime_requires_crewai_for_domain_routes(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "false")
     result = run_agent_turn("Quais treinamentos devo priorizar?")
-    assert result["status"] == "disabled"
+    assert result["status"] == "error"
     assert result["route"] == "training_recommendation"
+    assert "obrigatório" in result["answer"]
 
 
 def test_runtime_uses_training_tool_and_trace(monkeypatch):

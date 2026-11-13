@@ -7,7 +7,7 @@ any model or agent.
 from __future__ import annotations
 
 import json
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -178,20 +178,20 @@ def route_steps(route: str) -> list[dict[str, Any]]:
     """Describe the public sequential pipeline selected for a normal chat turn."""
     if route == "rag":
         return [
-            step("Roteamento legado", "Classificou a solicitação como pergunta documental; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("Roteamento determinístico", "Classificou a solicitação como pergunta documental; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
             step("Dify/Weaviate", "Recuperou contexto documental e produziu a resposta pelo Chatflow.", tool="Dify/Weaviate"),
             step("Resposta final", "Apresentou a resposta e as fontes recuperadas.", tool="Streamlit"),
         ]
     if route == "comparison":
         return [
-            step("Roteamento legado", "Selecionou a comparação documental; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("Roteamento determinístico", "Selecionou a comparação documental; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
             step("Dify/Weaviate", "Recuperou as evidências documentais para os níveis solicitados.", tool="Dify/Weaviate"),
             step("Comparação", "Comparou os valores extraídos sem inventar dados.", tool="comparison"),
             step("Resposta final", "Apresentou a comparação e suas fontes.", tool="Streamlit"),
         ]
     if route == "sql_indicator":
         return [
-            step("Roteamento legado", "Classificou a solicitação como indicador; nenhum agente CrewAI foi acionado.", tool="Roteador de intenções"),
+            step("Roteamento determinístico", "Classificou a solicitação como indicador; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
             step("DuckDB", "Consultou funções read-only e retornou dados agregados.", tool="DuckDB read-only"),
             step("Resposta final", "Organizou o indicador para apresentação.", tool="Streamlit"),
         ]
@@ -227,62 +227,3 @@ def route_steps(route: str) -> list[dict[str, Any]]:
         step("Core Router", summary, tool="Core Router"),
         step(label, "Executou a etapa pública correspondente.", tool=tool),
     ]
-
-
-def legacy_route_steps(
-    route: str,
-    *,
-    question: str = "",
-    rows: list[dict[str, Any]] | None = None,
-    sources: list[dict[str, Any]] | None = None,
-    tools: list[str] | None = None,
-    synthesis: Mapping[str, Any] | None = None,
-) -> list[dict[str, Any]]:
-    """Build detailed public steps from the actually executed legacy route."""
-    rows = rows or []
-    sources = sources or []
-    tools = tools or []
-    route_label = {
-        "sql_indicator": "indicador estruturado",
-        "comparison": "comparação documental",
-        "rag": "pergunta documental",
-        "competency_lookup": "consulta de competência",
-    }.get(route, route)
-    steps = [step(
-        "Roteamento legado",
-        f"Classificou a pergunta como {route_label}; o CrewAI não foi acionado nesta execução.",
-        tool="Roteador de intenções",
-    )]
-    if route == "sql_indicator":
-        operation = (
-            "competency_gaps"
-            if any(term in question.casefold() for term in ("lacuna", "competência"))
-            else "training_catalog"
-        )
-        steps.append(step(
-            "DuckDB read-only",
-            f"Executou a operação agregada {operation}; retornou {len(rows)} linha(s) sem identificadores individuais.",
-            tool=tools[0] if tools else "DuckDB read-only",
-        ))
-        if rows:
-            labels = ", ".join(str(row.get("competencia", "")) for row in rows[:3] if row.get("competencia"))
-            if labels:
-                steps.append(step(
-                    "Validação agregada",
-                    f"Priorizou os resultados por lacunas agregadas. Principais competências retornadas: {labels}.",
-                    tool="DuckDB read-only",
-                ))
-    elif route == "comparison":
-        steps.extend([
-            step("Dify/Weaviate", f"Recuperou evidências documentais para a comparação; {len(sources)} fonte(s) foram recebidas.", tool="Dify/Weaviate"),
-            step("Comparação", f"Extraiu valores dos trechos recuperados e montou {len(rows)} linha(s) comparativas.", tool="comparison"),
-        ])
-    elif route == "rag":
-        steps.append(step("Dify/Weaviate", f"Executou o Chatflow documental e recebeu {len(sources)} fonte(s) recuperada(s).", tool="Dify/Weaviate"))
-    elif route == "competency_lookup":
-        steps.append(step("DuckDB read-only", "Consultou o registro autorizado de competência em modo somente leitura.", tool=tools[0] if tools else "DuckDB read-only"))
-    if synthesis:
-        model = str(synthesis.get("model") or "Gemini configurado")
-        steps.append(step("Síntese final", f"Organizou a resposta final com o provider Gemini ({model}); nenhuma nova consulta documental foi feita nesta etapa.", tool="Gemini final synthesis"))
-    steps.append(step("Resposta final", "Apresentou o resultado ao usuário e preservou as fontes/tabelas disponíveis.", tool="Streamlit"))
-    return sanitize_steps(steps)

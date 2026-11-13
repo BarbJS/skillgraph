@@ -1,7 +1,6 @@
 from src.reasoning import (
     PublicReasoningStep,
     core_decision_step,
-    legacy_route_steps,
     route_steps,
     sanitize_steps,
     step,
@@ -54,34 +53,13 @@ def test_public_reasoning_contains_no_private_thought_field():
 def test_route_steps_are_safe_public_summaries():
     steps = route_steps("rag")
     assert [item["stage"] for item in steps] == [
-        "Roteamento legado",
+        "Roteamento determinístico",
         "Dify/Weaviate",
         "Resposta final",
     ]
-    assert "nenhum agente CrewAI" in steps[0]["summary"]
+    assert "etapa determinística" in steps[0]["summary"]
     assert all("summary" in item for item in steps)
     assert all("chain" not in item["summary"].lower() for item in steps)
-
-
-def test_legacy_sql_steps_describe_actual_duckdb_execution():
-    steps = legacy_route_steps(
-        "sql_indicator",
-        question="Quais competências têm mais lacunas?",
-        rows=[{"competencia": "Python", "funcionarios_com_deficit": 2}],
-        tools=["sql:competency_gap_summary"],
-        synthesis={"model": "gemini-3.1-flash-lite"},
-    )
-    assert [item["stage"] for item in steps] == [
-        "Roteamento legado",
-        "DuckDB read-only",
-        "Validação agregada",
-        "Síntese final",
-        "Resposta final",
-    ]
-    assert "competency_gaps" in steps[1]["summary"]
-    assert "Python" in steps[2]["summary"]
-    assert steps[3]["tool"] == "Gemini final synthesis"
-    assert all("thought" not in item and "prompt" not in item for item in steps)
 
 
 def test_multiagent_route_steps_list_agents_in_order():

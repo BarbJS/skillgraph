@@ -1,7 +1,7 @@
 # Plano — Streamlit Cloud + Dify Cloud + Gemini
 
 ## Objetivo
-Publicar uma versão pública e funcional do SkillGraph no Streamlit Community Cloud, usando Dify Cloud para RAG e Gemini como modelo conversacional único para Dify, CrewAI quando habilitado e síntese final.
+Publicar uma versão pública e funcional do SkillGraph no Streamlit Community Cloud, usando Dify Cloud para RAG, CrewAI como núcleo obrigatório do sistema multiagente e Gemini na síntese final e nos providers configurados.
 
 ## Premissas
 
@@ -48,7 +48,7 @@ Publicar uma versão pública e funcional do SkillGraph no Streamlit Community C
    - Conectar `BarbJS/skillgraph`, branch `main`, arquivo `app.py`.
    - Confirmar Python 3.11 e requirements cloud-ready.
    - Adicionar Secrets.
-   - Deploy inicial com `CREWAI_ENABLED=false`.
+   - Deploy com `CREWAI_ENABLED=true` e provider `CREWAI_LLM_*` validado; sem fallback legado silencioso.
    - Validar health, inicialização e logs.
 
 6. **Testes de aceitação públicos**

@@ -4,7 +4,7 @@
 
 Nada para o modo local. CrewAI é um framework Python de orquestração; os agentes, prompts, tarefas e ferramentas ficam no repositório. Não é necessário criar cada agente em um painel hospedado nem criar uma conta CrewAI para executar a arquitetura local.
 
-O CrewAI não fornece o LLM. Os agentes usarão o LM Studio local quando `CREWAI_ENABLED=true`, por meio de endpoint OpenAI-compatible. O JEV é um serviço externo separado, chamado como ferramenta pelo agente de currículo. No chat principal, as perguntas de treinamentos e políticas também passam pelo runtime multiagente quando essa flag está ativa; com a flag desativada, o sistema usa o fallback legado de RAG/SQL.
+O CrewAI não fornece o LLM. Os agentes usam o provider configurado em `CREWAI_LLM_*` por meio de endpoint compatível. O JEV é um serviço externo separado, chamado como ferramenta pelo agente de currículo. No chat principal, as rotas de domínio passam obrigatoriamente pelo runtime multiagente; smalltalk, guardrails e pedidos de esclarecimento são as únicas respostas determinísticas fora da crew. Não existe fallback legado silencioso de RAG/SQL.
 
 ## Agentes
 
@@ -82,7 +82,7 @@ Para OCR, configure `OCR_LANG` (padrão `eng`), `OCR_MAX_PAGES`, `OCR_ENABLED` e
 
 O JEV é chamado uma vez pelo backend, depois da redação de PII. A UI diferencia JEV desabilitado/sem chave, falha TLS/HTTP, resposta inválida e falha do modelo local. O sucesso só é registrado quando todas as etapas terminam; um erro nunca é mascarado como análise concluída.
 
-O CrewAI/JEV desativado não faz chamadas externas. O default de código é offline (`CREWAI_ENABLED=false`); para a execução integrada, habilite explicitamente `CREWAI_ENABLED=true` no `.env`. Recomenda-se testar primeiro um PDF textual sintético, depois um PDF escaneado e só então executar uma chamada JEV live com credencial autorizada.
+O CrewAI é obrigatório para as rotas de domínio. Se estiver desativado, ausente ou indisponível, a aplicação mostra um diagnóstico e interrompe a solicitação; ela não executa outro caminho em paralelo. Recomenda-se testar primeiro um PDF textual sintético, depois um PDF escaneado e só então executar uma chamada JEV live com credencial autorizada.
 
 ### Síntese final obrigatória com Gemini
 
@@ -104,7 +104,7 @@ O usuário não precisa alternar entre ambientes Python. O comando `make run-cre
 Variáveis:
 
 ```env
-CREWAI_ENABLED=false
+CREWAI_ENABLED=true
 CREWAI_LLM_MODEL=openai/meta-llama-3-8b-instruct
 CREWAI_LLM_BASE_URL=http://127.0.0.1:1234/v1
 CREWAI_LLM_API_KEY=lm-studio-local

@@ -18,7 +18,7 @@ Na validação, LightGBM obteve Macro F1 **0,7778**, balanced accuracy **0,8333*
 
 ## 3. Sistema multiagente com CrewAI
 
-O CrewAI orquestra agentes locais apoiados pelo LM Studio. O Core Router seleciona a rota; o especialista usa somente a ferramenta permitida; o Safety Reviewer valida schema, PII, escopo e evidência; o Response Synthesizer redige a resposta. Com `CREWAI_ENABLED=true`, o chat principal encaminha treinamentos e políticas ao runtime; se a dependência estiver desativada, permanece o fallback RAG/SQL.
+O CrewAI orquestra agentes locais apoiados pelo LM Studio. O Core Router seleciona a rota; o especialista usa somente a ferramenta permitida; o Safety Reviewer valida schema, PII, escopo e evidência; o Response Synthesizer redige a resposta. O chat principal encaminha treinamentos e políticas obrigatoriamente ao runtime multiagente; se a dependência estiver desativada, a solicitação é interrompida com diagnóstico e não há fallback RAG/SQL silencioso.
 
 | Agente | Papel | Ferramenta |
 |---|---|---|

@@ -23,7 +23,7 @@ def _llm():
 
 
 def _load_crewai():
-    if os.getenv("CREWAI_ENABLED", "false").casefold() != "true":
+    if os.getenv("CREWAI_ENABLED", "true").casefold() != "true":
         raise CrewAIUnavailable(
             "CrewAI está desativado; configure CREWAI_ENABLED=true."
         )
