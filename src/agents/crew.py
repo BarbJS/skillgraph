@@ -89,12 +89,12 @@ _ROUTE_SPECIALISTS: dict[str, tuple[tuple[str, str, str, tuple[str, ...]], ...]]
             ("TrainingCatalogTool",),
         ),
     ),
-    "policy_rag": (
+    "competency_development_rag": (
         (
-            "Policy Specialist",
-            "policy",
-            "Consultar políticas com fontes.",
-            ("DifyPolicyTool",),
+            "Competency & Development Specialist",
+            "rag_specialist",
+            "Consultar competências, cargos, trilhas, treinamentos e políticas com fontes.",
+            ("DifyRagTool",),
         ),
     ),
     "structured_data": (
@@ -208,13 +208,13 @@ def build_route_crew(
                 "unrecognized_skills, evidências, confiança e níveis incertos; remova PII."
             )
         elif role == "Prediction Specialist":
-            description = "Use somente a ferramenta PKL/XAI permitida no perfil estruturado do estado."
+            description = "Use somente a ferramenta PKL/XAI permitida no perfil estruturado em {ml_profile}; preserve recomendações, prioridades, incerteza e explicações."
         elif role == "Gap Analyst":
             description = "Analise somente prediction e employee_profile disponíveis e devolva lacunas estruturadas."
         elif role == "Learning Path & Training Recommendation Agent":
             description = "Consulte somente o catálogo DuckDB allowlisted para as prioridades do estado."
-        elif role == "Policy Specialist":
-            description = "Consulte a política somente pelo Dify e preserve fontes e ausência de evidência."
+        elif role == "Competency & Development Specialist":
+            description = "Consulte competências, cargos, trilhas, treinamentos e políticas somente pelo Dify; preserve fontes e ausência de evidência."
         else:
             description = "Execute somente a consulta read-only permitida para o indicador solicitado."
         tasks.append(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import time
 import uuid
@@ -205,7 +206,7 @@ def _title_for_route(route: str, question: str = "") -> str:
         "ml_prediction": "Recomendação de trilhas de competências",
         "gap_analysis": "Diagnóstico de lacunas de competências",
         "training_recommendation": "Recomendações de treinamentos",
-        "policy_rag": "Políticas de treinamento",
+        "competency_development_rag": "Competências e desenvolvimento",
         "structured_data": "Consulta de dados estruturados",
     }
     return route_titles.get(route, _title_from_question(question))
@@ -500,19 +501,28 @@ def _render_ml_page() -> None:
             )
             ml_trace.__enter__()
             try:
-                _render_public_reasoning("ml_prediction")
-                result = assistant.predict_from_question(ml_question)
-                final_answer, _ = synthesize_response(
-                    "ml_prediction",
-                    result.answer,
-                    structured_context={
-                        "profile": result.profile,
-                        "recommendations": result.recommendations,
-                        "priorities": result.priorities,
-                        "structured": result.structured,
-                    },
-                    trace=ml_trace,
-                )
+                interpreted = assistant.interpret_question(ml_question)
+                if interpreted.raw_action == "clarify":
+                    final_answer = interpreted.answer
+                    result = interpreted
+                else:
+                    profile_payload = json.dumps(interpreted.profile, ensure_ascii=False)
+                    agent_result = run_agent_turn(
+                        ml_question,
+                        conversation_state={},
+                        trace=ml_trace,
+                        ml_profile=interpreted.profile,
+                    )
+                    if agent_result.get("status") != "completed":
+                        raise MLAssistantError(agent_result.get("error") or agent_result.get("answer", "A rota de Machine Learning falhou."))
+                    final_answer = agent_result["answer"]
+                    result = type("MLAgentResult", (), {
+                        "answer": final_answer,
+                        "profile": interpreted.profile,
+                        "recommendations": agent_result.get("structured", {}).get("recommendations", []),
+                        "priorities": agent_result.get("structured", {}).get("priorities", []),
+                        "structured": agent_result.get("structured", {}),
+                    })()
                 final_answer = validate_user_output(final_answer, route="ml_prediction")
                 st.markdown(final_answer)
                 ml_trace.finish("success")
@@ -1245,7 +1255,7 @@ if question or uploaded_files:
     agent_route = route_turn(question)
     use_agent_runtime = agent_route.value in {
         "training_recommendation",
-        "policy_rag",
+        "competency_development_rag",
         "structured_data",
     } and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
     trace.route = agent_route.value if use_agent_runtime else route.intent.value
@@ -1294,7 +1304,7 @@ if question or uploaded_files:
                     tools = [
                         "TrainingCatalogTool"
                         if agent_result.get("route") == "training_recommendation"
-                        else "DifyPolicyTool"
+                        else "DifyRagTool"
                     ]
                     store.update_agent_state(
                         conversation_id,

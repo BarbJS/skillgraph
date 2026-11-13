@@ -12,7 +12,7 @@ class AgentRoute(StrEnum):
     ML = "ml_prediction"
     GAP = "gap_analysis"
     TRAINING = "training_recommendation"
-    POLICY = "policy_rag"
+    RAG = "competency_development_rag"
     STRUCTURED = "structured_data"
     CLARIFY = "clarify"
 
@@ -49,7 +49,7 @@ def route_turn(message: str, *, has_resume: bool = False) -> AgentRoute:
         term in normalized
         for term in ("política", "politica", "reembolso", "elegibilidade")
     ):
-        return AgentRoute.POLICY
+        return AgentRoute.RAG
     if any(
         term in normalized
         for term in ("treinamento", "treinamentos", "curso", "cursos")

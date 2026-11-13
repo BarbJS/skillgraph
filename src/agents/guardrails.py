@@ -53,7 +53,7 @@ def tool_allowed(agent: str, tool_name: str) -> bool:
         "Gap Analyst": set(),
         "Learning Path & Training Recommendation Agent": {"TrainingCatalogTool"},
         "Structured Data Specialist": {"CompetencyGapTool"},
-        "Policy Specialist": {"DifyPolicyTool"},
+        "Competency & Development Specialist": {"DifyRagTool"},
         "Safety Reviewer": set(),
         "Response Synthesizer": set(),
     }

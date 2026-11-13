@@ -28,7 +28,7 @@ O CrewAI orquestra agentes locais apoiados pelo LM Studio. O Core Router selecio
 | Prediction Specialist | Executar recomendação de trilhas e XAI | `CompetencyRecommendationTool` / PKL |
 | Gap Analyst | Interpretar prioridades e lacunas | Nenhuma; estado estruturado |
 | Learning Path & Training Recommendation Agent | Consultar cursos e pré-requisitos | `TrainingCatalogTool` / DuckDB read-only |
-| Policy Specialist | Consultar regras com fontes | `DifyPolicyTool` / Dify Chatflow |
+| Competency & Development Specialist | Consultar competências e desenvolvimento com fontes | `DifyRagTool` / Dify Chatflow |
 | Structured Data Specialist | Consultar indicadores autorizados | `TrainingCatalogTool` / DuckDB |
 | Safety Reviewer | Validar segurança, schema e evidência | Nenhuma |
 | Response Synthesizer | Compor resposta final revisada | Nenhuma |

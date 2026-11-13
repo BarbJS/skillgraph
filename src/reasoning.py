@@ -89,9 +89,9 @@ _AGENT_STEP_SPECS: dict[str, tuple[str, str | None]] = {
         "Consultou treinamentos existentes e verificou pré-requisitos.",
         "TrainingCatalogTool",
     ),
-    "Policy Specialist": (
-        "Consultou a política documental e preservou as fontes recuperadas.",
-        "DifyPolicyTool",
+    "Competency & Development Specialist": (
+        "Consultou o corpus de competências e desenvolvimento e preservou as fontes recuperadas.",
+        "DifyRagTool",
     ),
     "Structured Data Specialist": (
         "Consultou o indicador autorizado em dados estruturados.",
@@ -209,12 +209,12 @@ def route_steps(route: str) -> list[dict[str, Any]]:
             step("Safety Reviewer", "Validou cursos existentes, escopo e evidências.", tool="Safety Reviewer"),
             step("Response Synthesizer", "Redigiu a recomendação final.", tool="Response Synthesizer"),
         ]
-    if route == "policy_rag":
+    if route == "competency_development_rag":
         return [
-            step("Core Router", "Selecionou a rota de política documental.", tool="Core Router"),
-            step("Policy Specialist", "Consultou a política pelo Chatflow Dify.", tool="DifyPolicyTool"),
+            step("Core Router", "Selecionou a rota RAG de competências e desenvolvimento.", tool="Core Router"),
+            step("Competency & Development Specialist", "Consultou o corpus documental pelo Chatflow Dify.", tool="DifyRagTool"),
             step("Safety Reviewer", "Verificou fontes, escopo e ausência de decisão indevida.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Redigiu a resposta baseada na política.", tool="Response Synthesizer"),
+            step("Response Synthesizer", "Redigiu a resposta baseada nas evidências recuperadas.", tool="Response Synthesizer"),
         ]
     labels = {
         "smalltalk": ("Resposta local", "Reconheceu uma interação simples sem ferramenta externa."),

@@ -23,7 +23,7 @@ def test_route_titles_are_specific():
     assert (
         _title_for_route("ml_prediction") == "Recomendação de trilhas de competências"
     )
-    assert _title_for_route("policy_rag") == "Políticas de treinamento"
+    assert _title_for_route("competency_development_rag") == "Competências e desenvolvimento"
     assert _title_for_route("structured_data") == "Consulta de dados estruturados"
 
 

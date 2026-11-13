@@ -58,7 +58,7 @@ def test_gemini_parses_usage_and_configured_cost():
         input_usd_per_1m=1.0,
         output_usd_per_1m=2.0,
     )
-    result = client.synthesize({"route": "policy_rag", "draft_answer": "safe"})
+    result = client.synthesize({"route": "competency_development_rag", "draft_answer": "safe"})
     assert result.text == "Resposta final."
     assert result.input_tokens == 10
     assert result.output_tokens == 6

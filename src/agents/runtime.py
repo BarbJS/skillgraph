@@ -14,7 +14,7 @@ from src.observability import current_trace
 from src.agents.tools import (
     competency_recommendation_tool,
     jev_resume_tool,
-    policy_rag_tool,
+    rag_tool as retrieve_rag_tool,
     training_catalog_tool,
 )
 from src.dify_client import DifyClient
@@ -33,6 +33,7 @@ def run_agent_turn(
     resume_text: str | None = None,
     has_resume: bool = False,
     trace: Any = None,
+    ml_profile: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     state = dict(conversation_state or {})
     try:
@@ -99,7 +100,7 @@ def run_agent_turn(
             database = SkillGraphDatabase(
                 Path(os.getenv("SKILLGRAPH_DATA_DIR", "data_bd"))
             )
-        if route == AgentRoute.POLICY:
+        if route == AgentRoute.RAG:
             dify = DifyClient.from_environment(trace=trace)
 
         def prediction_tool(profile_json: str) -> str:
@@ -150,16 +151,16 @@ def run_agent_turn(
                 default=str,
             )
 
-        def policy_tool(question: str) -> str:
-            """Retrieve policy evidence through the published Dify Chatflow."""
+        def rag_tool(question: str) -> str:
+            """Retrieve competency and development evidence through Dify."""
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
             return json.dumps(
                 _trace_tool(
-                    "tool.policy_rag",
+                    "tool.rag",
                     "dify",
-                    "DifyPolicyTool",
-                    lambda: policy_rag_tool(dify, question),
+                    "DifyRagTool",
+                    lambda: retrieve_rag_tool(dify, question),
                 ),
                 ensure_ascii=False,
                 default=str,
@@ -170,8 +171,10 @@ def run_agent_turn(
             "CompetencyRecommendationTool": prediction_tool,
             "TrainingCatalogTool": training_tool,
             "CompetencyGapTool": competency_gap_tool,
-            "DifyPolicyTool": policy_tool,
+            "DifyRagTool": rag_tool,
         }
+        if route == AgentRoute.ML and not ml_profile:
+            raise RuntimeError("A rota de Machine Learning exige um perfil estruturado.")
         jev_result = {}
         resume_profile = None
         redacted_resume_text = ""
@@ -193,6 +196,8 @@ def run_agent_turn(
         crew = build_route_crew(route.value, tools=tools)
         result = crew.kickoff(
             inputs={
+                "ml_profile": json.dumps(ml_profile or {}, ensure_ascii=False),
+
                 "message": message,
                 "resume_text": (
                     "[processed by structured extractor]" if resume_text else ""

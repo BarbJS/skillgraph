@@ -404,7 +404,7 @@ O CrewAI não fornece o LLM; ele orquestra o modelo local do LM Studio. Os agent
 | Prediction Specialist | Executar recomendação de trilhas | `CompetencyRecommendationTool` / PKL |
 | Gap Analyst | Interpretar lacunas | Estado estruturado |
 | Learning Path & Training Recommendation Agent | Consultar treinamentos e pré-requisitos | `TrainingCatalogTool` / DuckDB |
-| Policy Specialist | Consultar políticas com fontes | `DifyPolicyTool` / Dify |
+| Competency & Development Specialist | Consultar competências, cargos, trilhas, treinamentos e políticas com fontes | `DifyRagTool` / Dify |
 | Structured Data Specialist | Consultar lacunas e indicadores agregados | `CompetencyGapTool` / DuckDB |
 | Safety Reviewer | Validar segurança, schema e evidências | Nenhuma |
 | Response Synthesizer | Redigir a resposta final | Nenhuma |
@@ -556,7 +556,7 @@ Fluxo: Core Router → Learning Path Agent → `TrainingCatalogTool` → Reviewe
 Quais regras de reembolso se aplicam a este treinamento?
 ```
 
-Fluxo: Core Router → Policy Specialist → `DifyPolicyTool` → Reviewer → Synthesizer.
+Fluxo: Core Router → Competency & Development Specialist → `DifyRagTool` → Reviewer → Synthesizer.
 
 ### Currículo e JEV opcional
 

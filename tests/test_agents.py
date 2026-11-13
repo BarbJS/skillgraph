@@ -32,7 +32,7 @@ def test_all_agent_prompts_exist():
         "prediction",
         "gap",
         "training",
-        "policy",
+        "rag_specialist",
         "reviewer",
         "synthesizer",
     }

@@ -169,14 +169,14 @@ def test_langfuse_sdk3_payload_uses_real_span_lifecycle():
 
     store = ObservabilityStore.__new__(ObservabilityStore)
     store._langfuse = FakeLangfuse()
-    trace = TraceContext("policy_rag", role="desenvolvedor", user_key="synthetic")
-    with trace.span("tool.policy_rag", "dify", task_name="DifyPolicyTool"):
+    trace = TraceContext("competency_development_rag", role="desenvolvedor", user_key="synthetic")
+    with trace.span("tool.rag", "dify", task_name="DifyPolicyTool"):
         pass
     trace.finish()
     store._send_langfuse(trace)
 
-    assert store._langfuse.root.name == "policy_rag"
-    assert store._langfuse.root.children[0][1].name == "tool.policy_rag"
+    assert store._langfuse.root.name == "competency_development_rag"
+    assert store._langfuse.root.children[0][1].name == "tool.rag"
     assert store._langfuse.root.calls[-1] == {"end": True}
     assert store._langfuse.root.children[0][1].calls[-1] == {"end": True}
     assert store._langfuse.flushed is True

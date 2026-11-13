@@ -74,6 +74,6 @@ def test_multiagent_route_steps_list_agents_in_order():
 
 
 def test_route_steps_do_not_expose_private_reasoning():
-    steps = route_steps("policy_rag")
+    steps = route_steps("competency_development_rag")
     assert all("thought" not in item and "prompt" not in item for item in steps)
-    assert steps[1]["tool"] == "DifyPolicyTool"
+    assert steps[1]["tool"] == "DifyRagTool"

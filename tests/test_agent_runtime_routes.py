@@ -5,7 +5,7 @@ from src.agents.runtime import run_agent_turn
 
 def test_training_policy_and_gap_messages_use_agent_routes():
     assert route_turn("Quais treinamentos devo priorizar?") is AgentRoute.TRAINING
-    assert route_turn("Quais regras de reembolso se aplicam?") is AgentRoute.POLICY
+    assert route_turn("Quais regras de reembolso se aplicam?") is AgentRoute.RAG
     assert route_turn("Quais competências têm mais lacunas?") is AgentRoute.STRUCTURED
 
 
@@ -28,9 +28,9 @@ def test_training_and_policy_roles_are_least_privilege():
         "Safety Reviewer",
         "Response Synthesizer",
     )
-    assert route_agent_roles("policy_rag") == (
+    assert route_agent_roles("competency_development_rag") == (
         "Core Router",
-        "Policy Specialist",
+        "Competency & Development Specialist",
         "Safety Reviewer",
         "Response Synthesizer",
     )
@@ -63,7 +63,7 @@ class _FakeCrew:
         self.tools = tools
 
     def kickoff(self, *, inputs):
-        assert "TrainingCatalogTool" in self.tools or "DifyPolicyTool" in self.tools
+        assert "TrainingCatalogTool" in self.tools or "DifyRagTool" in self.tools
         return type(
             "Result",
             (),
@@ -89,12 +89,12 @@ def test_runtime_uses_policy_tool(monkeypatch):
     )
     result = run_agent_turn("Quais regras de reembolso se aplicam?")
     assert result["status"] == "completed"
-    assert result["route"] == "policy_rag"
+    assert result["route"] == "competency_development_rag"
 
 
 class _PolicyFakeCrew(_FakeCrew):
     def kickoff(self, *, inputs):
-        assert "DifyPolicyTool" in self.tools
+        assert "DifyRagTool" in self.tools
         return super().kickoff(inputs=inputs)
 
 
@@ -107,7 +107,7 @@ def test_runtime_policy_wires_dify_tool(monkeypatch):
     )
     result = run_agent_turn("Quais regras de reembolso se aplicam?")
     assert result["status"] == "completed"
-    assert result["route"] == "policy_rag"
+    assert result["route"] == "competency_development_rag"
     assert any(
-        step.get("tool") == "DifyPolicyTool" for step in result["reasoning"]
+        step.get("tool") == "DifyRagTool" for step in result["reasoning"]
     )

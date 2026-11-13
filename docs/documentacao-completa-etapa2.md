@@ -257,7 +257,7 @@ O Microsoft Responsible AI Toolbox fica como evolução futura para análise de 
 
 **Desenvolvimento e implementação.** O CrewAI foi usado como orquestrador local sobre o LM Studio, com factory de crews por rota, prompts versionados, contratos Pydantic, limites de iteração, retry e timeout, `allow_delegation=False`, guardrails de entrada e revisão final. O Core Router classifica cada turno; o especialista executa somente a tarefa da rota; o Safety Reviewer verifica schema, PII, escopo e evidência; e o Response Synthesizer redige a resposta final. O pensamento privado do modelo não faz parte do contrato público: a interface expõe somente etapas estruturadas e sanitizadas.
 
-**Integração.** O runtime é o núcleo obrigatório do chat principal para as rotas de domínio. As perguntas de treinamentos usam a rota `training_recommendation` e `TrainingCatalogTool` sobre DuckDB read-only; perguntas de política usam `policy_rag` e `DifyPolicyTool` sobre o Chatflow existente. A rota `resume_analysis` combina extração PDF/OCR, perfil, JEV e agentes. Se o CrewAI estiver desativado ou indisponível, a solicitação é interrompida com diagnóstico explícito; não há fallback legado silencioso de RAG/SQL.
+**Integração.** O runtime é o núcleo obrigatório do chat principal para as rotas de domínio. As perguntas de treinamentos usam a rota `training_recommendation` e `TrainingCatalogTool` sobre DuckDB read-only; perguntas documentais usam `competency_development_rag` e `DifyRagTool` sobre o Chatflow existente. A rota `resume_analysis` combina extração PDF/OCR, perfil, JEV e agentes. Se o CrewAI estiver desativado ou indisponível, a solicitação é interrompida com diagnóstico explícito; não há fallback legado silencioso de RAG/SQL.
 
 **Impacto para os usuários.** O analista ou gestor recebe uma resposta de treinamento ou política produzida por um especialista delimitado, com fontes ou registros autorizados. O perfil Desenvolvedor consegue visualizar a rota, a ferramenta e os spans sem acessar conteúdo privado. A revisão humana continua obrigatória.
 
@@ -289,7 +289,7 @@ A relação entre a interface existente e as ferramentas da Etapa 2 é:
 ```text
 Streamlit → Core Router/CrewAI → especialista da rota
                                 ├── TrainingCatalogTool → DuckDB read-only
-                                ├── DifyPolicyTool → Dify/Weaviate
+                                ├── DifyRagTool → Dify/Weaviate
                                 ├── CompetencyRecommendationTool → PKL/XAI
                                 └── Resume/OCR → JEV opcional
 ```
@@ -315,7 +315,7 @@ Rotas principais:
 | `ml_prediction` | Prediction Specialist | PKL/XAI de competências |
 | `gap_analysis` | Gap Analyst | estado estruturado |
 | `training_recommendation` | Learning Path & Training Recommendation | funções read-only do DuckDB |
-| `policy_rag` | Policy Specialist | Chatflow Dify existente |
+| `competency_development_rag` | Competency & Development Specialist | Chatflow Dify existente |
 | `structured_data` | Structured Data Specialist | funções DuckDB existentes |
 | `smalltalk` | Core/local | nenhuma chamada externa |
 
@@ -357,7 +357,7 @@ Cada agente recebe somente a ferramenta mínima necessária:
 - Resume Interpreter → `JevResumeExtractionTool`;
 - Prediction Specialist → `CompetencyRecommendationTool`;
 - Learning Path Agent → `TrainingCatalogTool`;
-- Policy Agent → `DifyPolicyTool`;
+- Competency & Development Specialist → `DifyRagTool`;
 - Core, Profile, Gap, Reviewer e Synthesizer → nenhuma ferramenta externa.
 
 O DuckDB não treina nem executa a predição ML. O Prediction Agent não consulta DuckDB. O JEV não é um agente: é um serviço externo chamado como ferramenta pelo Resume Interpreter.

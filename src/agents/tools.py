@@ -32,9 +32,14 @@ def training_catalog_tool(
     return database.training_catalog(competency=competency)
 
 
-def policy_rag_tool(client: DifyClient, question: str) -> list[dict[str, Any]]:
+def rag_tool(client: DifyClient, question: str) -> list[dict[str, Any]]:
+    """Retrieve evidence from the complete competency/development corpus."""
     result = client.chat(question)
     return result.sources
+
+
+# Compatibility alias for callers that persisted the old tool name.
+policy_rag_tool = rag_tool
 
 
 def jev_resume_tool(

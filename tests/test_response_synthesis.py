@@ -29,7 +29,7 @@ def test_response_synthesis_sends_sanitized_context(monkeypatch):
 
     monkeypatch.setattr("src.response_synthesis.GeminiSynthesizer", FakeGemini)
     text, metadata = synthesize_response(
-        "policy_rag",
+        "competency_development_rag",
         "rascunho",
         structured_context={
             "resume_text": "não enviar",

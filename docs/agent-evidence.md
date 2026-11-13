@@ -8,7 +8,7 @@ Este documento registra os cenários multiagente definidos para avaliação da E
 |---|---|---|---|
 | Predição de trilha | `ml_prediction` | Core → Prediction → Reviewer → Synthesizer | PKL/XAI |
 | Recomendação de treinamento | `training_recommendation` | Core → Learning Path → Reviewer → Synthesizer | DuckDB read-only |
-| Política | `policy_rag` | Core → Policy → Reviewer → Synthesizer | Dify Chatflow |
+| RAG de competências e desenvolvimento | `competency_development_rag` | Core → Competency & Development Specialist → Reviewer → Synthesizer | Dify Chatflow |
 | Currículo | `resume_analysis` | Core → Resume Interpreter → Profile → Reviewer → Synthesizer | OCR/PyMuPDF + JEV backend |
 
 O Core Router continua sendo obrigatório. O chat principal encaminha as rotas de domínio para o runtime multiagente; o especialista é escolhido por rota e agentes de outras especialidades não são instanciados. Quando o CrewAI está desativado ou indisponível, a solicitação é interrompida com diagnóstico explícito, sem fallback legado de RAG/SQL. Cada ferramenta recebe somente os argumentos e permissões necessários.

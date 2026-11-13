@@ -176,7 +176,8 @@ class LocalMLAssistant:
         except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as exc:
             raise MLAssistantError("Não foi possível consultar o modelo local.") from exc
 
-    def predict_from_question(self, question: str) -> MLAssistantResult:
+    def interpret_question(self, question: str) -> MLAssistantResult:
+        """Convert natural language into a validated profile for the Prediction Specialist."""
         if not question.strip():
             raise MLAssistantError("Descreva as competências de um colaborador.")
         interpretation = _json_object(
@@ -195,7 +196,16 @@ class LocalMLAssistant:
             )
         if interpretation.get("action") != "recommend_track":
             raise MLAssistantError("A ação solicitada não é permitida nesta área.")
-        profile = _coerce_profile(interpretation)
+        return MLAssistantResult("", profile=_coerce_profile(interpretation))
+
+    def predict_from_question(self, question: str) -> MLAssistantResult:
+        interpreted = self.interpret_question(question)
+        if interpreted.raw_action == "clarify":
+            return interpreted
+        profile = interpreted.profile or {}
+        if not profile:
+            raise MLAssistantError("O perfil estruturado não foi produzido.")
+
         try:
             artifact = self.artifact or load_artifact(self.artifact_path)
             recommendation_kwargs = {"artifact": artifact}
