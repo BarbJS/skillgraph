@@ -214,7 +214,17 @@ def build_route_crew(
         elif role == "Learning Path & Training Recommendation Agent":
             description = "Consulte somente o catálogo DuckDB allowlisted para as prioridades do estado."
         elif role == "Competency & Development Specialist":
-            description = "Consulte competências, cargos, trilhas, treinamentos e políticas somente pelo Dify; preserve fontes e ausência de evidência."
+            description = (
+                "Responda diretamente à pergunta documental usando somente DifyRagTool. "
+                "Preserve o answer textual, sources, supported e conflitos; não solicite EmployeeProfile "
+                "quando a pergunta não for de currículo."
+            )
+        elif role == "Response Synthesizer" and route == "competency_development_rag":
+            description = (
+                "Use o handoff do Competency & Development Specialist para responder diretamente à pergunta. "
+                "Preserve a resposta do Dify e as fontes; não peça EmployeeProfile, não invente competências e não transforme "
+                "uma pergunta documental em análise de currículo."
+            )
         else:
             description = "Execute somente a consulta read-only permitida para o indicador solicitado."
         tasks.append(
@@ -258,6 +268,17 @@ def build_route_crew(
     specialist_tasks = tasks[1:-2]
     reviewer_task = tasks[-2]
     synthesizer_task = tasks[-1]
+    if route == "competency_development_rag":
+        reviewer_task.description = (
+            "Revise a resposta documental e as fontes retornadas pelo DifyRagTool quanto a escopo, "
+            "evidência, conflitos e ausência de suporte. Retorne um ReviewResult curto; não peça EmployeeProfile."
+        )
+        synthesizer_task.description = (
+            "Responda diretamente à pergunta original usando a resposta e as fontes do Competency & Development Specialist. "
+            "Preserve fatos, ressalvas e ausência de evidência; não peça EmployeeProfile, não invente competências e não faça análise de currículo."
+        )
+        reviewer_task.expected_output = "ReviewResult da evidência RAG"
+        synthesizer_task.expected_output = "Resposta documental final baseada no DifyRagTool"
     for index, task in enumerate(specialist_tasks):
         task.context = [core_task] if index == 0 else [specialist_tasks[index - 1]]
     if route == "resume_analysis" and len(specialist_tasks) >= 2:

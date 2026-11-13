@@ -32,10 +32,16 @@ def training_catalog_tool(
     return database.training_catalog(competency=competency)
 
 
-def rag_tool(client: DifyClient, question: str) -> list[dict[str, Any]]:
-    """Retrieve evidence from the complete competency/development corpus."""
+def rag_tool(client: DifyClient, question: str) -> dict[str, Any]:
+    """Retrieve the answer and evidence from the complete corpus."""
     result = client.chat(question)
-    return result.sources
+    return {
+        "answer": result.answer,
+        "sources": result.sources,
+        "conversation_id": result.conversation_id,
+        "message_id": result.message_id,
+        "supported": bool(result.answer and result.sources),
+    }
 
 
 # Compatibility alias for callers that persisted the old tool name.

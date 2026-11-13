@@ -221,6 +221,19 @@ def run_agent_turn(
         )
         reasoning_steps = sanitize_steps(reasoning_steps)
         local_answer = str(result)
+        rag_payload: dict[str, Any] = {}
+        if route == AgentRoute.RAG:
+            for output in tasks_output:
+                candidate = getattr(output, "raw", output)
+                if isinstance(candidate, str):
+                    try:
+                        candidate = json.loads(candidate)
+                    except json.JSONDecodeError:
+                        candidate = {}
+                if isinstance(candidate, dict) and (candidate.get("answer") or candidate.get("sources")):
+                    rag_payload = candidate
+            if rag_payload.get("answer"):
+                local_answer = str(rag_payload["answer"])
         final_answer, synthesis = synthesize_response(
             route.value,
             local_answer,
@@ -231,8 +244,11 @@ def run_agent_turn(
                 "profile": resume_profile.model_dump(mode="json")
                 if resume_profile
                 else None,
+                "rag_answer": rag_payload.get("answer", ""),
+                "rag_sources": rag_payload.get("sources", []),
                 "state": sanitize(state),
             },
+            sources=rag_payload.get("sources", []),
             trace=trace,
         )
         synthesis["fallback"] = False

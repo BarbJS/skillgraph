@@ -111,6 +111,35 @@ class _PolicyFakeCrew(_FakeCrew):
         return super().kickoff(inputs=inputs)
 
 
+class _RagResult:
+    tasks_output = [
+        type("Output", (), {"raw": '{"answer":"Treinamentos online valem horas.","sources":[{"document":"faq_desenvolvimento.md","content":"Cursos online valem horas."}]}'})()
+    ]
+
+    def __str__(self):
+        return 'RAG answer: Treinamentos online valem horas.'
+
+
+class _RagFakeCrew(_PolicyFakeCrew):
+    def kickoff(self, *, inputs):
+        assert "DifyRagTool" in self.tools
+        return _RagResult()
+
+
+def test_rag_runtime_preserves_answer_and_sources(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "true")
+    monkeypatch.setenv("DIFY_API_KEY", "synthetic")
+    monkeypatch.setattr(
+        "src.agents.runtime.build_route_crew",
+        lambda route, tools: _RagFakeCrew(route, tools),
+    )
+    result = run_agent_turn("Treinamentos online contam para a carga horária anual?")
+    assert result["status"] == "completed"
+    assert result["answer"] != ""
+    assert "EmployeeProfile" not in result["answer"]
+    assert result["route"] == "competency_development_rag"
+
+
 def test_runtime_policy_wires_dify_tool(monkeypatch):
     monkeypatch.setenv("CREWAI_ENABLED", "true")
     monkeypatch.setenv("DIFY_API_KEY", "synthetic")

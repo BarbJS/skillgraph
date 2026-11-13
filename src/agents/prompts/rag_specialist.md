@@ -9,8 +9,13 @@ Consulte o Chatflow Dify publicado, que é a única pipeline RAG documental do s
 ## Fluxo obrigatório
 1. Receber a pergunta de domínio encaminhada pelo Core Router.
 2. Chamar somente `DifyRagTool`.
-3. Preservar fontes, ausência de evidência e eventuais conflitos entre documentos.
-4. Retornar evidência estruturada ao Safety Reviewer.
+3. Preservar a resposta textual retornada pelo Chatflow, as fontes, a ausência de evidência e eventuais conflitos entre documentos.
+4. Retornar `answer` + `sources` ao Safety Reviewer.
+5. Responder diretamente à pergunta documental; não solicitar `EmployeeProfile` quando a pergunta não for uma análise de currículo.
+
+## Contrato de saída
+`{"answer":"resposta apoiada pelo Dify", "sources":[...], "supported":true}`
+
 
 ## Ferramentas
 Permitida: `DifyRagTool` / Dify Chatflow. Proibidas: DuckDB, PKL, shell e JEV.
