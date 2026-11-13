@@ -1,16 +1,8 @@
+from src.agents.router import AgentRoute
 from src.evaluation_runner import _execute_case
-from src.intent_router import Intent
 
 
-class FakeDatabase:
-    def competency_gaps(self):
-        return [{"competencia": "Python"}]
-
-    def training_catalog(self):
-        return [{"treinamento": "Python"}]
-
-
-def test_golden_case_executes_current_router_and_guardrails():
+def test_golden_case_executes_unified_core_guardrails():
     result = _execute_case(
         {
             "id": "security-1",
@@ -19,10 +11,9 @@ def test_golden_case_executes_current_router_and_guardrails():
             "must_block": True,
             "expected_answer_facts": ["segurança"],
             "category": "security",
-        },
-        FakeDatabase(),
+        }
     )
-    assert result["actual_route"] == Intent.BLOCKED.value
+    assert result["actual_route"] == AgentRoute.BLOCKED.value
     assert result["actual_blocked"] is True
     assert result["answer_executed"] is True
     assert result["passed"] is True

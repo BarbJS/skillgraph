@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from src.comparison import extract_hours, levels_in_question
 from src.dify_client import DifyClient
 from src.jev_client import JevClient
 from src.sql_tools import SkillGraphDatabase
@@ -24,6 +25,44 @@ def competency_recommendation_tool(
     from src.ml_inference import recommend_from_profile
 
     return recommend_from_profile(artifact_path, skills)
+
+
+def competency_lookup_tool(
+    database: SkillGraphDatabase, employee_id: str, competency_id: str
+) -> dict[str, Any] | None:
+    """Look up one synthetic case without exposing arbitrary SQL."""
+    return database.competency_case(employee_id, competency_id)
+
+
+def comparison_tool(
+    client: DifyClient, question: str
+) -> dict[str, Any]:
+    """Retrieve comparison evidence and calculate only source-backed values."""
+    levels = levels_in_question(question)
+    if len(levels) < 2:
+        return {"answer": "Informe pelo menos dois níveis de cargo para comparar.", "rows": [], "sources": []}
+    sources: list[dict[str, Any]] = []
+    for level in levels:
+        query = (
+            f"{question}\nRecupere somente a evidência documental da métrica para o nível {level}. "
+            "Não compare nem invente valores."
+        )
+        sources.extend(client.chat(query).sources)
+    result = extract_hours(sources, levels)
+    source_payload = [
+        {
+            "document": str(item.get("document") or item.get("source") or ""),
+            "content": str(item.get("content") or "")[:2000],
+        }
+        for item in sources
+        if isinstance(item, dict)
+    ]
+    return {
+        "answer": result.answer,
+        "rows": result.rows,
+        "sources": source_payload,
+        "supported": len(result.rows) >= 2,
+    }
 
 
 def training_catalog_tool(

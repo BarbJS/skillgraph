@@ -51,13 +51,13 @@ def test_public_reasoning_contains_no_private_thought_field():
 
 
 def test_route_steps_are_safe_public_summaries():
-    steps = route_steps("rag")
+    steps = route_steps("competency_development_rag")
     assert [item["stage"] for item in steps] == [
-        "Roteamento determinístico",
-        "Dify/Weaviate",
-        "Resposta final",
+        "Core Router",
+        "Competency & Development Specialist",
+        "Safety Reviewer",
+        "Response Synthesizer",
     ]
-    assert "etapa determinística" in steps[0]["summary"]
     assert all("summary" in item for item in steps)
     assert all("chain" not in item["summary"].lower() for item in steps)
 

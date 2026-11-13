@@ -1,14 +1,12 @@
-"""Run deterministic Etapa 1 portions of the SkillGraph golden suite."""
+"""Run route-only checks for the unified Core Router golden suite."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from src.answer_router import answer_structured_question
-from src.intent_router import Intent, route_question
+from src.agents.router import AgentRoute, route_turn
 from src.security import UserRole, evaluate_input
-from src.sql_tools import SkillGraphDatabase
 
 ROOT = Path(__file__).resolve().parents[1]
 GOLDEN_PATH = ROOT / "evals" / "golden_dataset.jsonl"
@@ -23,41 +21,40 @@ def load_cases() -> list[dict]:
     ]
 
 
+def _expected_route(value: str) -> str:
+    return {
+        "rag": AgentRoute.RAG.value,
+        "sql_indicator": AgentRoute.STRUCTURED.value,
+    }.get(value, value)
+
+
 def run() -> dict:
-    database = SkillGraphDatabase(ROOT / "data")
     results = []
-    try:
-        for case in load_cases():
-            route = route_question(case["question"])
-            security = evaluate_input(case["question"], UserRole.DESENVOLVEDOR)
-            answer = ""
-            passed = route.intent.value == case["expected_route"]
-            if route.intent is Intent.BLOCKED:
-                answer = security.public_message
-                passed = passed and not security.allowed and case["must_block"]
-            elif route.intent is Intent.SQL_INDICATOR:
-                routed = answer_structured_question(case["question"], database)
-                answer = routed.answer
-                passed = passed and bool(routed.rows)
-            results.append(
-                {
-                    "id": case["id"],
-                    "route": route.intent.value,
-                    "passed": passed,
-                    "answer_preview": answer[:240],
-                }
-            )
-    finally:
-        database.close()
+    for case in load_cases():
+        question = str(case.get("question", ""))
+        route = route_turn(question)
+        security = evaluate_input(question, UserRole.DESENVOLVEDOR)
+        blocked = not security.allowed or route is AgentRoute.BLOCKED
+        expected_blocked = bool(case.get("must_block"))
+        route_ok = route.value == _expected_route(str(case.get("expected_route", "")))
+        block_ok = blocked is expected_blocked
+        passed = route_ok and block_ok
+        results.append(
+            {
+                "id": case["id"],
+                "route": route.value,
+                "passed": passed,
+                "answer_preview": "" if blocked else "Rota selecionada pelo Core Router.",
+            }
+        )
     report = {
+        "mode": "core_router",
         "total": len(results),
         "passed": sum(item["passed"] for item in results),
         "results": results,
     }
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    REPORT_PATH.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
 
 

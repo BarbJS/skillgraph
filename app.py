@@ -16,18 +16,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
-from src.agents.router import route_turn
+from src.agents.router import AgentRoute, route_turn
 from src.agents.runtime import run_agent_turn
-from src.answer_router import (
-    answer_comparison_question,
-    answer_competency_question,
-    answer_smalltalk_question,
-    answer_structured_question,
-)
-from src.dify_client import DifyClient, DifyClientError
 from src.error_ui import render_error_panel
-from src.gemini_synthesizer import GeminiSynthesisError
-from src.intent_router import Intent, route_question
 from src.ml_assistant import MLAssistantError
 from src.monitoring import record_event
 from src.observability import OBSERVABILITY, TraceContext
@@ -35,7 +26,6 @@ from src.output_security import validate_user_output
 from src.privacy_ui import upload_privacy_notice
 from src.progress_ui import ResumeProgress
 from src.reasoning import route_steps
-from src.response_synthesis import synthesize_response
 from src.resume_extractor import ResumeExtractionError
 from src.resume_upload import extract_uploaded_resume
 from src.security import UserRole, evaluate_input
@@ -79,15 +69,6 @@ _startup_mark("imports")
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 load_dotenv(PROJECT_ROOT / ".env")
-
-def stream_production_rag(
-    query: str, conversation_id: str = "", trace: TraceContext | None = None
-):
-    """Yield production Dify Chatflow events with usage-aware tracing."""
-
-    client = DifyClient.from_environment(trace=trace)
-    yield from client.stream_chat(query, conversation_id=conversation_id)
-
 
 LOG_PATH = Path(
     os.getenv("OBSERVABILITY_LOG_PATH", str(PROJECT_ROOT / "logs" / "skillgraph.jsonl"))
@@ -1256,19 +1237,16 @@ if question or uploaded_files:
             _title_from_question(question), "dify", role=role
         )
     conversation_id = st.session_state.active_conversation_id
-    route = route_question(question)
-    agent_route = route_turn(question)
-    use_agent_runtime = agent_route.value in {
-        "training_recommendation",
-        "competency_development_rag",
-        "structured_data",
-    } and route.intent in {Intent.RAG, Intent.SQL_INDICATOR}
-    trace.route = agent_route.value if use_agent_runtime else route.intent.value
+    agent_route = route_turn(
+        question,
+        conversation_state=store.agent_state(conversation_id, role=role),
+    )
+    trace.route = agent_route.value
     store.add_message(
         conversation_id,
         "user",
         question,
-        route=agent_route.value if use_agent_runtime else route.intent.value,
+        route=agent_route.value,
         request_id=request_id,
         conversation_role=role,
     )
@@ -1286,136 +1264,66 @@ if question or uploaded_files:
         progress = st.empty()
         progress.info("Analisando sua pergunta…")
         answer, sources, tools, table_rows, chart_frame = "", [], [], None, None
-        agent_handled = False
-        answer_already_synthesized = False
-        synthesis_metadata: dict[str, Any] = {}
         reasoning_steps: list[dict[str, Any]] = []
         try:
-            if use_agent_runtime:
-                progress.info("Executando o fluxo multiagente…")
-                agent_result = run_agent_turn(
-                    question,
-                    conversation_state=store.agent_state(
-                        conversation_id, role=role
-                    ),
-                    trace=trace,
-                )
-                agent_status = agent_result.get("status")
-                if agent_status == "completed":
-                    answer = agent_result.get(
-                        "answer", "O fluxo multiagente foi concluído."
-                    )
-                    reasoning_steps = agent_result.get("reasoning", [])
-                    tools = [
-                        "TrainingCatalogTool"
-                        if agent_result.get("route") == "training_recommendation"
-                        else "DifyRagTool"
-                    ]
-                    store.update_agent_state(
-                        conversation_id,
-                        {
-                            **store.agent_state(conversation_id, role=role),
-                            **agent_result.get("state_patch", {}),
-                        },
-                        role=role,
-                    )
-                    agent_handled = True
-                    answer_already_synthesized = True
-                elif agent_status == "disabled":
-                    raise DifyClientError(
-                        "O sistema multiagente é obrigatório e não está disponível."
-                    )
-                elif agent_status == "error":
-                    # Do not invoke Dify/Gemini a second time after a provider
-                    # failure in the agent flow; this would multiply quota usage.
-                    raise DifyClientError(
-                        agent_result.get(
-                            "error",
-                            "O fluxo multiagente falhou; a solicitação não será repetida automaticamente.",
-                        )
-                    )
-                elif agent_status in {"blocked", "clarify", "local"}:
-                    answer = agent_result.get(
-                        "answer", "O fluxo multiagente não foi concluído."
-                    )
-                    reasoning_steps = agent_result.get("reasoning", [])
-                    tools = ["agent_guardrail"]
-                    agent_handled = True
-                else:
-                    raise DifyClientError(
-                        agent_result.get(
-                            "answer", "O fluxo multiagente não foi concluído."
-                        )
-                    )
+            progress.info("Executando o fluxo multiagente…")
+            ml_profile = None
+            if agent_route is AgentRoute.ML:
+                from src.ml_assistant import LocalMLAssistant
+                from src.ml_inference import ARTIFACT_NAME
 
-            if not agent_handled and route.intent is Intent.SMALLTALK:
-                answer = answer_smalltalk_question(question).answer
-                tools = ["smalltalk"]
-            elif not agent_handled and route.intent is Intent.COMPARISON:
-                progress.info("Comparando as informações…")
-                result = answer_comparison_question(question)
-                answer = result.answer
-                table_rows = result.rows or []
-                if table_rows:
-                    frame = pd.DataFrame(table_rows)
-                    chart_frame = frame.rename(
-                        columns={
-                            "nível": "categoria",
-                            "carga mínima anual (horas)": "valor",
-                        }
+                artifact_path = Path(
+                    os.getenv(
+                        "SKILLGRAPH_ML_ARTIFACT",
+                        str(PROJECT_ROOT / ".ml_artifacts" / ARTIFACT_NAME),
                     )
-                tools = ["training_hours_comparison"]
-            elif not agent_handled and route.intent is Intent.COMPETENCY_LOOKUP and database:
-                progress.info("Consultando dados de competências…")
-                result = answer_competency_question(question, database)
-                answer = result.answer
-                tools = ["sql:competency_case_lookup"]
-            elif not agent_handled and route.intent is Intent.SQL_INDICATOR and database:
-                progress.info("Consultando dados estruturados…")
-                with trace.span(
-                    "duckdb.structured",
-                    "duckdb",
-                    task_name="answer_structured_question",
-                ):
-                    result = answer_structured_question(question, database)
-                answer = result.answer
-                table_rows = result.rows or []
+                )
+                ml_profile = LocalMLAssistant(artifact_path).interpret_question(question).profile
+                if not ml_profile:
+                    raise RuntimeError("Não foi possível estruturar o perfil para a recomendação ML.")
+            agent_result = run_agent_turn(
+                question,
+                conversation_state=store.agent_state(conversation_id, role=role),
+                trace=trace,
+                ml_profile=ml_profile,
+            )
+            agent_status = agent_result.get("status")
+            if agent_status == "completed":
+                answer = agent_result.get("answer", "O fluxo multiagente foi concluído.")
+                reasoning_steps = agent_result.get("reasoning", [])
                 tools = [
-                    (
-                        "sql:competency_gap_summary"
-                        if "lacuna" in question.lower()
-                        or "competência" in question.lower()
-                        else "sql:training_catalog"
-                    )
+                    step.get("tool")
+                    for step in reasoning_steps
+                    if step.get("tool") and step.get("tool") != "Core Router"
                 ]
-            elif not agent_handled and route.intent is Intent.RAG:
-                progress.info("Consultando documentos e preparando a resposta…")
-                placeholder = st.empty()
-                dify_id = st.session_state.conversation_id
-                with trace.span("rag.dify", "dify", task_name="stream_chat"):
-                    event_stream = stream_production_rag(
-                        question, conversation_id=dify_id, trace=trace
-                    )
-                for event in event_stream:
-                    if event.get("event") == "message":
-                        answer += str(event.get("answer", ""))
-                        dify_id = str(event.get("conversation_id") or dify_id)
-                        placeholder.markdown(answer + "▌")
-                    elif event.get("event") == "message_end":
-                        sources.extend(_sources_from_event(event))
-                if not answer:
-                    raise DifyClientError(
-                        "O Chatflow do Dify encerrou sem retornar uma resposta."
-                    )
-                st.session_state.conversation_id = dify_id
-                placeholder.empty()
-                tools = ["rag:dify"]
-            elif not agent_handled:
-                raise DifyClientError(
-                    "Não foi possível encaminhar essa pergunta com segurança."
+                sources = agent_result.get("sources", []) or []
+                table_rows = agent_result.get("table_rows")
+                store.update_agent_state(
+                    conversation_id,
+                    {
+                        **store.agent_state(conversation_id, role=role),
+                        **agent_result.get("state_patch", {}),
+                    },
+                    role=role,
+                )
+            elif agent_status in {"blocked", "clarify", "local"}:
+                answer = agent_result.get("answer", "O fluxo multiagente não foi concluído.")
+                reasoning_steps = agent_result.get("reasoning", [])
+                tools = ["Core Router"]
+            else:
+                raise RuntimeError(
+                    agent_result.get("error", "O fluxo multiagente falhou; a solicitação não será repetida automaticamente.")
                 )
             progress.empty()
-        except (DifyClientError, SQLToolError) as exc:
+            if table_rows:
+                frame = pd.DataFrame(table_rows)
+                chart_frame = frame.rename(
+                    columns={
+                        "nível": "categoria",
+                        "carga mínima anual (horas)": "valor",
+                    }
+                )
+        except (SQLToolError, RuntimeError) as exc:
             progress.empty()
             st.error(
                 "Não consegui concluir esta solicitação. Tente novamente ou reformule a pergunta. "
@@ -1426,7 +1334,7 @@ if question or uploaded_files:
             record_event(
                 LOG_PATH,
                 request_id=request_id,
-                route=agent_route.value if use_agent_runtime else route.intent.value,
+                route=agent_route.value,
                 status="error",
                 latency_ms=(time.perf_counter() - started) * 1000,
                 error=True,
@@ -1434,32 +1342,16 @@ if question or uploaded_files:
             st.stop()
 
         if not reasoning_steps:
-            reasoning_steps = route_steps(route.intent.value)
-        if route.intent not in {Intent.SMALLTALK} and not answer_already_synthesized:
-            try:
-                answer, synthesis_metadata = synthesize_response(
-                    route.intent.value,
-                    answer,
-                    structured_context={
-                        "question": question,
-                        "route": route.intent.value,
-                        "tools": tools,
-                    },
-                    sources=sources,
-                    table_rows=table_rows,
-                    trace=trace,
-                )
-            except GeminiSynthesisError as exc:
-                progress.empty()
-                st.error(
-                    "Não foi possível gerar a resposta final pelo Gemini. "
-                    "Verifique a configuração da API e tente novamente."
-                )
-                trace.finish("error", str(exc))
-                OBSERVABILITY.record(trace)
-                st.stop()
+            reasoning_steps = route_steps(agent_route.value)
+        try:
+            answer = validate_user_output(answer, route=agent_route.value)
+        except Exception as exc:
+            trace.finish("error", str(exc))
+            OBSERVABILITY.record(trace)
+            st.error("A resposta foi bloqueada pela validação de segurança.")
+            st.stop()
         _render_public_reasoning(
-            agent_route.value if use_agent_runtime else route.intent.value,
+            agent_route.value,
             reasoning_steps,
             key=f"live-{request_id}",
         )
@@ -1474,7 +1366,7 @@ if question or uploaded_files:
             conversation_id,
             "assistant",
             answer,
-            route=agent_route.value if use_agent_runtime else route.intent.value,
+            route=agent_route.value,
             request_id=request_id,
             sources=sources,
             reasoning=reasoning_steps,
@@ -1484,7 +1376,7 @@ if question or uploaded_files:
             {
                 "id": assistant_id,
                 "content": answer,
-                "route": agent_route.value if use_agent_runtime else route.intent.value,
+                "route": agent_route.value,
                 "trace_id": trace.trace_id,
             }
         )
@@ -1495,7 +1387,7 @@ if question or uploaded_files:
         record_event(
             LOG_PATH,
             request_id=request_id,
-            route=agent_route.value if use_agent_runtime else route.intent.value,
+            route=agent_route.value,
             status="success",
             latency_ms=(time.perf_counter() - started) * 1000,
             tools=tools,

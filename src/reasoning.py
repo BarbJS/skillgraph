@@ -97,6 +97,14 @@ _AGENT_STEP_SPECS: dict[str, tuple[str, str | None]] = {
         "Consultou o indicador autorizado em dados estruturados.",
         "CompetencyGapTool",
     ),
+    "Competency Lookup Specialist": (
+        "Consultou o caso específico autorizado em dados estruturados.",
+        "CompetencyLookupTool",
+    ),
+    "Document Comparison Specialist": (
+        "Recuperou evidências documentais para uma comparação source-backed.",
+        "ComparisonTool",
+    ),
     "Safety Reviewer": (
         "Validou schema, escopo, PII, evidência e necessidade de revisão humana.",
         "Safety Reviewer",
@@ -175,55 +183,33 @@ def step(
 
 
 def route_steps(route: str) -> list[dict[str, Any]]:
-    """Describe the public sequential pipeline selected for a normal chat turn."""
-    if route == "rag":
-        return [
-            step("Roteamento determinístico", "Classificou a solicitação como pergunta documental; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
-            step("Dify/Weaviate", "Recuperou contexto documental e produziu a resposta pelo Chatflow.", tool="Dify/Weaviate"),
-            step("Resposta final", "Apresentou a resposta e as fontes recuperadas.", tool="Streamlit"),
-        ]
-    if route == "comparison":
-        return [
-            step("Roteamento determinístico", "Selecionou a comparação documental; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
-            step("Dify/Weaviate", "Recuperou as evidências documentais para os níveis solicitados.", tool="Dify/Weaviate"),
-            step("Comparação", "Comparou os valores extraídos sem inventar dados.", tool="comparison"),
-            step("Resposta final", "Apresentou a comparação e suas fontes.", tool="Streamlit"),
-        ]
-    if route == "sql_indicator":
-        return [
-            step("Roteamento determinístico", "Classificou a solicitação como indicador; esta etapa determinística não requer uma crew.", tool="Roteador de intenções"),
-            step("DuckDB", "Consultou funções read-only e retornou dados agregados.", tool="DuckDB read-only"),
-            step("Resposta final", "Organizou o indicador para apresentação.", tool="Streamlit"),
-        ]
+    """Describe the public pipeline selected by the Core Router."""
     if route == "structured_data":
-        return [
-            step("Core Router", "Selecionou a consulta estruturada de lacunas.", tool="Core Router"),
-            step("Structured Data Specialist", "Consultou as lacunas agregadas no DuckDB read-only.", tool="CompetencyGapTool"),
-            step("Safety Reviewer", "Verificou que o resultado é agregado e não expõe identificadores.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Organizou o indicador final para o usuário.", tool="Response Synthesizer"),
-        ]
-    if route == "training_recommendation":
-        return [
-            step("Core Router", "Selecionou a rota de recomendação de treinamentos.", tool="Core Router"),
-            step("Learning Path & Training Recommendation Agent", "Consultou cursos e pré-requisitos permitidos.", tool="TrainingCatalogTool"),
-            step("Safety Reviewer", "Validou cursos existentes, escopo e evidências.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Redigiu a recomendação final.", tool="Response Synthesizer"),
-        ]
-    if route == "competency_development_rag":
-        return [
-            step("Core Router", "Selecionou a rota RAG de competências e desenvolvimento.", tool="Core Router"),
-            step("Competency & Development Specialist", "Consultou o corpus documental pelo Chatflow Dify.", tool="DifyRagTool"),
-            step("Safety Reviewer", "Verificou fontes, escopo e ausência de decisão indevida.", tool="Safety Reviewer"),
-            step("Response Synthesizer", "Redigiu a resposta baseada nas evidências recuperadas.", tool="Response Synthesizer"),
-        ]
-    labels = {
-        "smalltalk": ("Resposta local", "Reconheceu uma interação simples sem ferramenta externa."),
-        "competency_lookup": ("Consulta estruturada", "Consultou uma competência autorizada em modo read-only."),
-        "blocked": ("Guardrail", "Interrompeu a solicitação antes de acessar ferramentas."),
-    }
-    label, summary = labels.get(route, ("Roteamento", "Encaminhou a solicitação para o fluxo apropriado."))
-    tool = {"competency_lookup": "DuckDB read-only"}.get(route)
+        roles = ("Core Router", "Structured Data Specialist", "Safety Reviewer", "Response Synthesizer")
+    elif route == "training_recommendation":
+        roles = ("Core Router", "Learning Path & Training Recommendation Agent", "Safety Reviewer", "Response Synthesizer")
+    elif route == "competency_development_rag":
+        roles = ("Core Router", "Competency & Development Specialist", "Safety Reviewer", "Response Synthesizer")
+    elif route == "gap_analysis":
+        roles = ("Core Router", "Gap Analyst", "Safety Reviewer", "Response Synthesizer")
+    elif route == "competency_lookup":
+        roles = ("Core Router", "Competency Lookup Specialist", "Safety Reviewer", "Response Synthesizer")
+    elif route == "comparison":
+        roles = ("Core Router", "Document Comparison Specialist", "Safety Reviewer", "Response Synthesizer")
+    elif route == "ml_prediction":
+        roles = ("Core Router", "Prediction Specialist", "Safety Reviewer", "Response Synthesizer")
+    elif route == "resume_analysis":
+        roles = ("Core Router", "Resume Interpreter", "Profile Normalizer", "Safety Reviewer", "Response Synthesizer")
+    elif route == "blocked":
+        return [step("Guardrail", "Interrompeu a solicitação antes de acessar ferramentas.", status="blocked", tool="Core Router")]
+    elif route == "clarify":
+        return [step("Core Router", "Solicitou esclarecimento antes de selecionar uma ferramenta.", status="skipped", tool="Core Router")]
+    elif route == "smalltalk":
+        return [step("Resposta local", "Reconheceu uma interação simples sem ferramenta externa.", tool="Core Router")]
+    else:
+        return [step("Core Router", "Encaminhou a solicitação para o fluxo apropriado.", tool="Core Router")]
+
     return [
-        step("Core Router", summary, tool="Core Router"),
-        step(label, "Executou a etapa pública correspondente.", tool=tool),
+        step(role, _AGENT_STEP_SPECS[role][0], tool=_AGENT_STEP_SPECS[role][1])
+        for role in roles
     ]

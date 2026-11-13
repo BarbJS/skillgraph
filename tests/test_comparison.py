@@ -1,14 +1,14 @@
 from pathlib import Path
 
+from src.agents.router import AgentRoute, route_turn
 from src.comparison import extract_hours
-from src.intent_router import Intent, route_question
 
 ROOT = Path(__file__).parents[1]
 
 
 def test_comparison_route():
     question = "Qual é a carga horária de um cargo sênior comparado com um júnior?"
-    assert route_question(question).intent is Intent.COMPARISON
+    assert route_turn(question) is AgentRoute.COMPARISON
 
 
 def test_extract_hours_is_source_driven():
