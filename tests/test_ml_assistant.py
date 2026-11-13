@@ -47,6 +47,20 @@ def test_profile_rejects_personal_identifiers():
         raise AssertionError("PII should be rejected")
 
 
+def test_interpreter_rejects_pii_before_model_call(tmp_path):
+    session = FakeSession([])
+    assistant = LocalMLAssistant(tmp_path / "artifact.pkl", session=session)
+    try:
+        assistant.interpret_question(
+            "O colaborador tem CPF 12345678901 e Python avançado. Qual trilha?"
+        )
+    except MLAssistantError as exc:
+        assert "dados pessoais" in str(exc)
+    else:
+        raise AssertionError("PII should be rejected before interpretation")
+    assert session.payloads == []
+
+
 def test_natural_language_route_returns_backend_recommendation(tmp_path, monkeypatch):
     artifact = tmp_path / "skillgraph_competency_tracks.pkl"
     artifact.write_bytes(b"placeholder")

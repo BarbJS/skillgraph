@@ -77,3 +77,47 @@ def test_gemini_rejects_pii_before_http():
     else:
         raise AssertionError("Gemini must reject PII")
     assert not session.calls
+
+
+def test_gemini_allows_decimal_ml_scores():
+    session = Session()
+    client = GeminiSynthesizer(enabled=True, api_key="key", session=session)
+    result = client.synthesize(
+        {
+            "route": "ml_prediction",
+            "prediction": {
+                "recommendations": [
+                    {"track": "Dados e Ciência de Dados", "compatibility": 0.29999999999999993}
+                ],
+                "priorities": [{"skill": "Mathematics", "gap": 4.9399999999999995}],
+            },
+        }
+    )
+    assert result.text == "Resposta final."
+    assert len(session.calls) == 1
+
+
+def test_gemini_rejects_phone_numbers_but_not_decimal_scores():
+    session = Session()
+    client = GeminiSynthesizer(enabled=True, api_key="key", session=session)
+    try:
+        client.synthesize({"employee_context": "telefone: +55 (11) 99999-9999"})
+    except GeminiSynthesisError as exc:
+        assert "PII" in str(exc)
+    else:
+        raise AssertionError("Gemini must reject phone PII")
+    assert not session.calls
+    client.synthesize({"coverage": 0.333})
+    assert len(session.calls) == 1
+
+
+def test_gemini_rejects_compact_phone_numbers():
+    session = Session()
+    client = GeminiSynthesizer(enabled=True, api_key="key", session=session)
+    try:
+        client.synthesize({"employee_context": "telefone: 11999999999"})
+    except GeminiSynthesisError as exc:
+        assert "PII" in str(exc)
+    else:
+        raise AssertionError("Gemini must reject compact phone PII")
+    assert not session.calls

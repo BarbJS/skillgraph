@@ -12,6 +12,8 @@ from typing import Any
 
 import requests
 
+from src.privacy import contains_protected_pii
+
 
 def normalize_skill_name(name: str) -> str:
     from src.ml_inference import normalize_skill_name as _normalize_skill_name
@@ -212,6 +214,10 @@ class LocalMLAssistant:
         """Convert natural language into a validated profile for the Prediction Specialist."""
         if not question.strip():
             raise MLAssistantError("Descreva as competências de um colaborador.")
+        if contains_protected_pii(question):
+            raise MLAssistantError(
+                "Remova dados pessoais identificáveis antes de solicitar uma recomendação."
+            )
         interpretation = _json_object(
             self._completion(
                 [

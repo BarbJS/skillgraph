@@ -41,7 +41,18 @@ _PATTERNS = (
     ("email", re.compile(r"\b[\w.+-]+@[\w.-]+\.[a-z]{2,}\b", re.I)),
     (
         "phone",
-        re.compile(r"(?:\+?\d{1,3}[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?\d{4,5}[\s-]?\d{4}\b"),
+        re.compile(
+            r"(?ix)(?:"
+            r"\b(?:telefone|celular|phone|mobile)\b\s*[:=]?\s*"
+            r"\+?[\d][\d\s().-]{7,20}"
+            r"|"
+            r"(?<![\d.])(?:\+?\d{1,3}[\s-]?)?"
+            r"(?:\(\d{2}\)|\d{2})[\s-]?\d{4,5}[\s-]\d{4}"
+            r"(?![\d.])"
+            r"|"
+            r"(?<![\d.])\d{10,11}(?![\d.])"
+            r")"
+        ),
     ),
 )
 _DECISION_PATTERN = re.compile(
