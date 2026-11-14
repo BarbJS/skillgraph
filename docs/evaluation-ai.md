@@ -3,11 +3,13 @@
 RAGAS foi removido do projeto. A avaliação de qualidade usa Golden Dataset, testes automatizados e DeepEval.
 
 - RAGAS: não utilizado.
-- DeepEval: LLM-as-a-judge com LM Studio local.
+- DeepEval: LLM-as-a-judge com Google Gemini, somente em avaliação live explicitamente autorizada.
+
+O judge usa `EVAL_JUDGE_MODEL=gemini-3.1-flash-lite` no endpoint Google Gemini e as métricas que dependem de embeddings usam `EVAL_EMBEDDING_MODEL=gemini-embedding-001`. Nenhum desses adapters é importado ou executado no caminho normal do chat.
 - Golden Dataset: casos sintéticos versionados.
 - Relatórios: `output/evaluation/`.
 
-O modo live exige `--yes-live` e pode consumir tokens do LM Studio.
+O modo live exige `--yes-live` e pode consumir quota do Google Gemini. Ele nunca é chamado pelo chat normal.
 
 ## Métricas DeepEval
 

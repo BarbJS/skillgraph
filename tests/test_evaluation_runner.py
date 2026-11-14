@@ -46,6 +46,9 @@ def test_live_runner_reports_progress_and_writes_report(monkeypatch, tmp_path):
 
     class FakeModel:
         model_name = "judge-test"
+        provider = "test"
+        base_url = "test://judge"
+        embeddings = type("Embeddings", (), {"model_name": "gemini-embedding-001", "provider": "test", "base_url": "test://embedding"})()
 
     monkeypatch.setattr(
         "src.evaluation_runner.DifyClient.from_environment",
