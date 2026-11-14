@@ -201,6 +201,7 @@ def run_agent_turn(
             dify = DifyClient.from_environment(trace=trace)
 
         prediction_cache: str | None = None
+        rag_cache: dict[str, Any] | None = None
 
         def prediction_tool(profile_json: str) -> str:
             """Run the persisted competency PKL exactly once for a validated profile."""
@@ -268,18 +269,17 @@ def run_agent_turn(
 
         def rag_tool(question: str) -> str:
             """Retrieve competency and development evidence through Dify."""
+            nonlocal rag_cache
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
-            return json.dumps(
-                _trace_tool(
+            if rag_cache is None:
+                rag_cache = _trace_tool(
                     "tool.rag",
                     "dify",
                     "DifyRagTool",
                     lambda: retrieve_rag_tool(dify, question),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
+                )
+            return json.dumps(rag_cache, ensure_ascii=False, default=str)
 
         def lookup_tool() -> str:
             """Run the allowlisted lookup for synthetic employee and competency IDs."""
@@ -396,9 +396,21 @@ def run_agent_turn(
             "ml_profile": ml_profile,
             "state": sanitize(state),
         }
-        final_answer, synthesis = synthesize_response(route.value, local_answer, structured_context=structured_context, sources=sources, trace=trace)
-        if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
-            final_answer = _preserve_rag_answer(local_answer, final_answer, rag_payload)
+        if route == AgentRoute.RAG:
+            final_answer = local_answer
+            synthesis = {
+                "provider": "dify",
+                "preserved": True,
+                "source_type": rag_payload.get("source_type", "dify"),
+            }
+        else:
+            final_answer, synthesis = synthesize_response(
+                route.value,
+                local_answer,
+                structured_context=structured_context,
+                sources=sources,
+                trace=trace,
+            )
 
         synthesis["fallback"] = False
         synthesis["provider"] = "gemini"
@@ -465,6 +477,7 @@ def run_agent_turn(
             dify = DifyClient.from_environment(trace=trace)
 
         prediction_cache: str | None = None
+        rag_cache: dict[str, Any] | None = None
 
         def prediction_tool(profile_json: str) -> str:
             """Run the persisted competency PKL exactly once for a validated profile."""
@@ -534,18 +547,17 @@ def run_agent_turn(
 
         def rag_tool(question: str) -> str:
             """Retrieve competency and development evidence through Dify."""
+            nonlocal rag_cache
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
-            return json.dumps(
-                _trace_tool(
+            if rag_cache is None:
+                rag_cache = _trace_tool(
                     "tool.rag",
                     "dify",
                     "DifyRagTool",
                     lambda: retrieve_rag_tool(dify, question),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
+                )
+            return json.dumps(rag_cache, ensure_ascii=False, default=str)
 
         def lookup_tool() -> str:
             """Run the allowlisted lookup for synthetic employee and competency IDs."""
