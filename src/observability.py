@@ -12,7 +12,44 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import requests
+
 from src.alerting import AlertManager
+
+
+def _langfuse_base_url() -> str:
+    base = (_secret_value("LANGFUSE_BASE_URL") or _secret_value("LANGFUSE_HOST")).rstrip("/")
+    for suffix in ("/api/public/ingestion", "/api/public", "/api"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)].rstrip("/")
+    return base
+
+
+def _langfuse_http_configured() -> bool:
+    return bool(_secret_value("LANGFUSE_PUBLIC_KEY") and _secret_value("LANGFUSE_SECRET_KEY") and _langfuse_base_url())
+
+
+def _sanitize_error(value: Any) -> str:
+    message = str(value or "")
+    for name in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "GEMINI_API_KEY", "DIFY_API_KEY", "TYPESAFE_API_KEY"):
+        secret = _secret_value(name)
+        if secret:
+            message = message.replace(secret, "[redacted]")
+    return message[:300]
+
+
+def _safe_metadata(value: Any) -> Any:
+    if isinstance(value, str):
+        lowered = value.casefold()
+        if any(term in lowered for term in ("prompt", "chain_of_thought", "resume_text", "curriculum", "currículo", "answer", "content")):
+            return "[redacted]"
+        return _sanitize_error(value)
+    if isinstance(value, dict):
+        return {str(key): _safe_metadata(item) for key, item in value.items() if str(key).casefold() not in {"prompt", "chain_of_thought", "reasoning", "resume", "resume_text", "answer", "content", "input", "output"}}
+    if isinstance(value, list):
+        return [_safe_metadata(item) for item in value[:50]]
+    return value
 
 LOG_PATH = Path(
     os.getenv("OBSERVABILITY_LOG_PATH", "logs/observability.jsonl")
@@ -280,20 +317,67 @@ class ObservabilityStore:
     @staticmethod
     def _safe_langfuse_error(exc: Exception) -> str:
         """Return a useful SDK error without exposing credentials."""
-        message = str(exc)
-        for key in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"):
-            secret = os.getenv(key, "")
-            if secret:
-                message = message.replace(secret, "[redacted]")
-        return f"{type(exc).__name__}: {message[:300]}"
+        return f"{type(exc).__name__}: {_sanitize_error(exc)}"
+
+    def _send_langfuse_http_fallback(self, trace) -> None:
+        if not _langfuse_http_configured():
+            return
+        events = [{
+            "id": trace.trace_id,
+            "type": "trace-create",
+            "timestamp": trace.started_at,
+            "body": {
+                "id": trace.trace_id,
+                "name": trace.route,
+                "input": {"route": trace.route},
+                "metadata": _safe_metadata({"role": trace.role, "user_id": trace.user_id, "status": trace.status}),
+            },
+        }]
+        for span in trace.spans:
+            if span.name == "trace":
+                continue
+            events.append({
+                "id": span.span_id,
+                "type": "span-create",
+                "timestamp": span.started_at,
+                "body": {
+                    "id": span.span_id,
+                    "trace_id": trace.trace_id,
+                    "name": span.name,
+                    "metadata": _safe_metadata({"service": span.service, "task_name": span.task_name, "status": span.status, "model": span.metadata.get("model"), "agent": span.metadata.get("agent"), "tool": span.metadata.get("tool"), "error": _sanitize_error(span.error)}),
+                    "output": {"duration_ms": round(span.duration_ms, 2), "input_tokens": span.input_tokens, "output_tokens": span.output_tokens, "cost": round(span.cost, 8), "status": span.status},
+                },
+            })
+        response = requests.post(
+            f"{_langfuse_base_url()}/api/public/ingestion",
+            auth=(_secret_value("LANGFUSE_PUBLIC_KEY"), _secret_value("LANGFUSE_SECRET_KEY")),
+            headers={"Content-Type": "application/json"},
+            json={"batch": events},
+            timeout=10,
+        )
+        response.raise_for_status()
+        self._langfuse_send_count += 1
+        self._langfuse_last_trace_id = trace.trace_id
+
+    def _send_langfuse_once(self, trace) -> None:
+        if self._langfuse:
+            self._send_langfuse(trace)
+            if self._langfuse_last_trace_id == trace.trace_id:
+                return
+        try:
+            self._send_langfuse_http_fallback(trace)
+        except Exception as exc:
+            self._langfuse_error = self._safe_langfuse_error(exc)
 
     def langfuse_status(self) -> dict[str, Any]:
+        self._initialize_langfuse()
         return {
             "enabled": _enabled(),
-            "initialized": self._langfuse is not None,
+            "initialized": self._langfuse is not None or _langfuse_http_configured(),
             "error": self._langfuse_error,
             "sent_count": self._langfuse_send_count,
             "last_trace_id": self._langfuse_last_trace_id,
+            "base_url": _langfuse_base_url() if _enabled() else "",
         }
 
     def record(self, trace):
@@ -302,8 +386,8 @@ class ObservabilityStore:
         _write_local_trace(summary)
         self._check_alerts(summary)
         self._initialize_langfuse()
-        if self._langfuse:
-            self._send_langfuse(trace)
+        if _enabled():
+            self._send_langfuse_once(trace)
         return summary
 
     def _check_alerts(self, s):
