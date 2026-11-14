@@ -26,15 +26,49 @@ def current_trace() -> "TraceContext | None":
     return _CURRENT_TRACE.get()
 
 
+def _secret_value(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    try:
+        import streamlit as st
+
+        return str(st.secrets.get(name, "")).strip()
+    except Exception:
+        return ""
+
+
 def _enabled() -> bool:
     """Enable Langfuse when explicitly enabled or fully configured."""
-    flag = os.getenv("LANGFUSE_ENABLED")
-    if flag is not None:
+    flag = _secret_value("LANGFUSE_ENABLED")
+    if flag:
         return flag.casefold() == "true"
-    public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
-    secret_key = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
-    base_url = os.getenv("LANGFUSE_BASE_URL", "").strip() or os.getenv("LANGFUSE_HOST", "").strip()
+    public_key = _secret_value("LANGFUSE_PUBLIC_KEY")
+    secret_key = _secret_value("LANGFUSE_SECRET_KEY")
+    base_url = _secret_value("LANGFUSE_BASE_URL") or _secret_value("LANGFUSE_HOST")
     return bool(public_key and secret_key and base_url)
+
+
+def _sanitize_error(value: Any) -> str:
+    message = str(value or "")
+    for name in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "GEMINI_API_KEY", "DIFY_API_KEY", "TYPESAFE_API_KEY"):
+        secret = _secret_value(name)
+        if secret:
+            message = message.replace(secret, "[redacted]")
+    return message[:300]
+
+
+def _safe_metadata(value: Any) -> Any:
+    if isinstance(value, str):
+        lowered = value.casefold()
+        if any(term in lowered for term in ("prompt", "chain_of_thought", "resume_text", "curriculum", "currículo", "answer", "content")):
+            return "[redacted]"
+        return _sanitize_error(value)
+    if isinstance(value, dict):
+        return {str(key): _safe_metadata(item) for key, item in value.items() if str(key).casefold() not in {"prompt", "chain_of_thought", "reasoning", "resume", "resume_text", "answer", "content", "input", "output"}}
+    if isinstance(value, list):
+        return [_safe_metadata(item) for item in value[:50]]
+    return value
 
 
 def _langfuse_options() -> dict[str, Any]:
@@ -44,14 +78,14 @@ def _langfuse_options() -> dict[str, Any]:
         "flush_at": 1,
         "flush_interval": 0.5,
     }
-    public_key = os.getenv("LANGFUSE_PUBLIC_KEY", "").strip()
-    secret_key = os.getenv("LANGFUSE_SECRET_KEY", "").strip()
-    base_url = (
-        os.getenv("LANGFUSE_BASE_URL", "").strip()
-        or os.getenv("LANGFUSE_HOST", "").strip()
-    )
-    release = os.getenv("LANGFUSE_RELEASE", "skillgraph-local").strip()
-    sample_rate = os.getenv("LANGFUSE_SAMPLE_RATE", "1.0").strip()
+    public_key = _secret_value("LANGFUSE_PUBLIC_KEY")
+    secret_key = _secret_value("LANGFUSE_SECRET_KEY")
+    base_url = _secret_value("LANGFUSE_BASE_URL") or _secret_value("LANGFUSE_HOST")
+    release = _secret_value("LANGFUSE_RELEASE") or "skillgraph-cloud"
+    sample_rate = _secret_value("LANGFUSE_SAMPLE_RATE") or "1.0"
+    environment = _secret_value("LANGFUSE_ENVIRONMENT")
+    if environment:
+        options["environment"] = environment
     if public_key:
         options["public_key"] = public_key
     if secret_key:
@@ -293,12 +327,15 @@ class ObservabilityStore:
         try:
             root = self._langfuse.start_span(
                 name=trace.route,
-                metadata={
+                metadata=_safe_metadata({
                     "role": trace.role,
                     "user_id": trace.user_id,
                     "status": trace.status,
-                },
+                    "span_names": [span.name for span in trace.spans if span.name != "trace"],
+                }),
                 input={"route": trace.route},
+                level="ERROR" if trace.status == "error" else "DEFAULT",
+                status_message=_sanitize_error(trace.error),
             )
             input_tokens = sum(s.input_tokens for s in trace.spans)
             output_tokens = sum(s.output_tokens for s in trace.spans)
@@ -323,18 +360,18 @@ class ObservabilityStore:
             for span in trace.spans:
                 if span.name == "trace":
                     continue
-                metadata = {
+                metadata = _safe_metadata({
                     "service": span.service,
                     "task_name": span.task_name,
                     "status": span.status,
-                }
-                metadata.update(
-                    {
+                    "duration_ms": round(span.duration_ms, 2),
+                    "error": _sanitize_error(span.error),
+                    **{
                         key: value
                         for key, value in span.metadata.items()
-                        if key in {"observation_type", "usage_source", "cost_source", "model"}
-                    }
-                )
+                        if key in {"observation_type", "usage_source", "cost_source", "model", "provider", "agent", "tool", "route"}
+                    },
+                })
                 usage = {
                     "input": int(span.input_tokens),
                     "output": int(span.output_tokens),
