@@ -30,6 +30,27 @@ from src.resume_profile import extract_profile, render_profile
 from src.sql_tools import SkillGraphDatabase
 
 
+def _preserve_rag_answer(canonical: str, synthesized: str, payload: dict[str, Any]) -> str:
+    """Keep Dify evidence when final wording drops supported facts."""
+    canonical_text = str(canonical or "").strip()
+    candidate = str(synthesized or "").strip()
+    if not canonical_text:
+        return candidate
+    if not candidate:
+        return canonical_text
+    if any(marker in candidate.casefold() for marker in ("não encontrei", "nao encontrei", "não há informação", "nao ha informacao")):
+        return canonical_text
+    critical = set(re.findall(r"\b\d+(?:[,.]\d+)?%?\b", canonical_text))
+    critical.update(
+        token.casefold()
+        for token in ("elegibilidade", "aprovação", "aprovacao", "gestor", "rh", "reembolso", "treinamento")
+        if token in canonical_text.casefold()
+    )
+    if not critical.issubset(set(re.findall(r"\b\d+(?:[,.]\d+)?%?\b", candidate)) | {token for token in critical if token in candidate.casefold()}):
+        return canonical_text
+    return candidate
+
+
 def _ml_deterministic_draft(profile: dict[str, Any], prediction: dict[str, Any]) -> str:
     """Build a dynamic, model-grounded ML draft before Gemini wording."""
     recommendations = prediction.get("recommendations") or []
@@ -350,6 +371,8 @@ def run_agent_turn(
                     rag_payload = candidate
                 if candidate.get("rows") and not rag_payload.get("rows"):
                     rag_payload["rows"] = candidate.get("rows")
+        if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
+            rag_payload["supported"] = True
         if rag_payload.get("answer"):
             local_answer = str(rag_payload["answer"])
         elif tasks_output:
@@ -374,6 +397,9 @@ def run_agent_turn(
             "state": sanitize(state),
         }
         final_answer, synthesis = synthesize_response(route.value, local_answer, structured_context=structured_context, sources=sources, trace=trace)
+        if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
+            final_answer = _preserve_rag_answer(local_answer, final_answer, rag_payload)
+
         synthesis["fallback"] = False
         synthesis["provider"] = "gemini"
         state_patch: dict[str, Any] = {"last_route": route.value}
@@ -624,6 +650,8 @@ def run_agent_turn(
                     rag_payload = candidate
                 if candidate.get("rows") and not rag_payload.get("rows"):
                     rag_payload["rows"] = candidate.get("rows")
+        if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
+            rag_payload["supported"] = True
         if rag_payload.get("answer"):
             local_answer = str(rag_payload["answer"])
         elif tasks_output:
