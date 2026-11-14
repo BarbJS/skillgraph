@@ -189,7 +189,7 @@ def route_steps(route: str) -> list[dict[str, Any]]:
     elif route == "training_recommendation":
         roles = ("Core Router", "Learning Path & Training Recommendation Agent", "Safety Reviewer", "Response Synthesizer")
     elif route == "competency_development_rag":
-        roles = ("Core Router", "Competency & Development Specialist", "Safety Reviewer", "Response Synthesizer")
+        roles = ("Core Router", "Competency & Development Specialist", "Safety Reviewer")
     elif route == "gap_analysis":
         roles = ("Core Router", "Gap Analyst", "Safety Reviewer", "Response Synthesizer")
     elif route == "competency_lookup":

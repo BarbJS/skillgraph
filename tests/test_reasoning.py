@@ -56,7 +56,6 @@ def test_route_steps_are_safe_public_summaries():
         "Core Router",
         "Competency & Development Specialist",
         "Safety Reviewer",
-        "Response Synthesizer",
     ]
     assert all("summary" in item for item in steps)
     assert all("chain" not in item["summary"].lower() for item in steps)

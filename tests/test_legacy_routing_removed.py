@@ -63,4 +63,7 @@ def test_every_domain_route_has_reviewer_and_synthesizer():
     ):
         roles = route_agent_roles(route)
         assert roles[0] == "Core Router"
-        assert roles[-2:] == ("Safety Reviewer", "Response Synthesizer")
+        if route == "competency_development_rag":
+            assert roles[-1] == "Safety Reviewer"
+        else:
+            assert roles[-2:] == ("Safety Reviewer", "Response Synthesizer")

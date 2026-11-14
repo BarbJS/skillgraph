@@ -45,7 +45,6 @@ def test_training_and_policy_roles_are_least_privilege():
         "Core Router",
         "Competency & Development Specialist",
         "Safety Reviewer",
-        "Response Synthesizer",
     )
 
 
