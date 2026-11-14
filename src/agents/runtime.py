@@ -30,6 +30,42 @@ from src.resume_profile import extract_profile, render_profile
 from src.sql_tools import SkillGraphDatabase
 
 
+def _ml_deterministic_draft(profile: dict[str, Any], prediction: dict[str, Any]) -> str:
+    """Build a dynamic, model-grounded ML draft before Gemini wording."""
+    recommendations = prediction.get("recommendations") or []
+    recognized = prediction.get("recognized_skills") or []
+    unknown = prediction.get("unrecognized_skills") or []
+    priorities = prediction.get("priorities") or []
+    uncertainty = prediction.get("uncertainty") or {}
+    tracks = "; ".join(
+        f"{item.get('track', 'trilha não identificada')} ({float(item.get('compatibility', 0)):.0%})"
+        for item in recommendations[:3]
+    ) or "nenhuma trilha foi retornada pelo modelo"
+    recognized_text = ", ".join(
+        f"{item.get('input', item.get('feature', 'competência'))} (nível {item.get('level', 'não informado')})"
+        for item in recognized[:8]
+    ) or "nenhuma competência foi mapeada"
+    unknown_text = ", ".join(str(item.get('input', 'competência')) for item in unknown[:8])
+    priority_text = ", ".join(
+        f"{item.get('skill', 'competência')} (lacuna {float(item.get('gap', 0)):.1f})"
+        for item in priorities[:5]
+    ) or "nenhuma prioridade calculada"
+    answer = (
+        f"Perfil analisado: {profile.get('employee_context', 'colaborador não identificado')}.\n\n"
+        f"Trilhas retornadas pelo modelo: {tracks}.\n\n"
+        f"Competências reconhecidas: {recognized_text}.\n\n"
+        f"Prioridades de desenvolvimento: {priority_text}.\n\n"
+        f"Incerteza: {uncertainty.get('level', 'não informada')}; cobertura do vocabulário: "
+        f"{(prediction.get('input_quality') or {}).get('coverage', 'não informada')}."
+    )
+    if unknown_text:
+        answer += (
+            f"\n\nCompetências informadas que não estão no vocabulário do artefato atual: {unknown_text}. "
+            "Isso não significa que elas não existam ou que o colaborador não as possua; elas não influenciaram o cálculo."
+        )
+    return answer
+
+
 def run_agent_turn(
     message: str,
     *,
@@ -320,6 +356,8 @@ def run_agent_turn(
             candidate = getattr(tasks_output[-1], "raw", tasks_output[-1])
             if isinstance(candidate, dict) and candidate.get("answer"):
                 local_answer = str(candidate["answer"])
+        if route == AgentRoute.ML and prediction_result:
+            local_answer = _ml_deterministic_draft(ml_profile or {}, prediction_result)
         if not local_answer.strip():
             local_answer = "O fluxo especialista foi concluído sem uma resposta textual."
         if isinstance(rag_payload.get("rows"), list):
@@ -592,6 +630,8 @@ def run_agent_turn(
             candidate = getattr(tasks_output[-1], "raw", tasks_output[-1])
             if isinstance(candidate, dict) and candidate.get("answer"):
                 local_answer = str(candidate["answer"])
+        if route == AgentRoute.ML and prediction_result:
+            local_answer = _ml_deterministic_draft(ml_profile or {}, prediction_result)
         if not local_answer.strip():
             local_answer = "O fluxo especialista foi concluído sem uma resposta textual."
         if isinstance(rag_payload.get("rows"), list):

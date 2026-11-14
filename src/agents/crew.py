@@ -146,7 +146,8 @@ def build_route_crew(
 
     core = agent("Core Router", "core", "Orquestrar a rota selecionada e coordenar os handoffs com segurança.")
     reviewer = agent("Safety Reviewer", "reviewer", "Revisar segurança, evidências e escopo.")
-    synthesizer = agent("Response Synthesizer", "synthesizer", "Redigir a resposta final baseada nos JSONs revisados.")
+    synthesizer_prompt = "prediction_synthesizer" if route == "ml_prediction" else "synthesizer"
+    synthesizer = agent("Response Synthesizer", synthesizer_prompt, "Redigir a resposta final baseada nos JSONs revisados.")
 
     tasks: list[Any] = [
         Task(
