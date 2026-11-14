@@ -51,11 +51,13 @@ _ML = (
     "proximo passo",
 )
 _POLICY = (
-    "política", "politica", "reembolso", "elegibilidade", "carga horária",
-    "carga horaria", "horas de treinamento", "prazo para", "contam para",
-    "conta para", "vale horas", "valem horas", "vale como carga",
-    "valem como carga", "conta como carga", "contam como carga",
-    "horário de trabalho", "horario de trabalho",
+    "política", "politica", "reembolso", "elegibilidade", "critério", "criterio",
+    "critérios", "criterios", "participar de um treinamento", "participar do treinamento",
+    "participar de treinamento", "requisitos para participar", "avaliação mínima",
+    "avaliacao minima", "aprovação do gestor", "aprovacao do gestor", "ativo na empresa",
+    "carga horária", "carga horaria", "horas de treinamento", "prazo para", "contam para",
+    "conta para", "vale horas", "valem horas", "vale como carga", "valem como carga",
+    "conta como carga", "contam como carga", "horário de trabalho", "horario de trabalho",
 )
 _TRAINING = ("treinamento", "treinamentos", "curso", "cursos")
 _GAP = ("lacuna", "lacunas", "gap", "prioridade de desenvolvimento")
