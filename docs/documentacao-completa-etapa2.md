@@ -194,7 +194,7 @@ make train-ml
 make run
 ```
 
-A instalação do FLAML fica em `.flaml/`, também ignorada pelo Git. A Etapa 2 não exige alteração no Docker/Dify: o Docker continua executando o Dify da Etapa 1, enquanto o Streamlit e o LM Studio executam a rota ML localmente.
+A instalação do FLAML fica em `.flaml/`, também ignorada pelo Git. A Etapa 2 não exige alteração no Docker/Dify: o Docker continua executando o Dify da Etapa 1, enquanto o Streamlit e o LM Studio executam a rota ML localmente. O pacote Python de desenvolvimento já contém as dependências necessárias; o bootstrap apenas prepara o checkout pinado do FLAML.
 
 ## 8. Integração com LLM e usuários de RH
 
@@ -687,7 +687,7 @@ A Etapa 2 também consolidou práticas de manutenção:
 - `.python-version` para tornar a versão explícita;
 - módulos separados para OCR, privacidade, progresso, erros, reasoning, XAI e UI;
 - testes unitários e de integração com mocks;
-- `requirements-dev.txt`;
+- `requirements.txt` para produção e `requirements-dev.txt` para desenvolvimento/CI;
 - hooks pre-commit com Black, Ruff, AST, JSON, YAML e detecção de chaves;
 - CI no GitHub Actions com instalação, `pip check`, compilação e pytest;
 - Dependabot para atualizações controladas;
@@ -695,7 +695,7 @@ A Etapa 2 também consolidou práticas de manutenção:
 - release automatizado por tags SemVer;
 - exclusão de ambientes, bases, logs, modelos e segredos pelo `.gitignore`.
 
-Os serviços externos continuam separados: Dify, Weaviate, PostgreSQL, Redis e proxies executam em Docker; Streamlit, CrewAI, OCR, ML e clientes JEV/Dify executam no `.venv` oficial; LM Studio permanece no host.
+Os serviços externos continuam separados: Dify, Weaviate, PostgreSQL, Redis e proxies executam em Docker; Streamlit, CrewAI, OCR, ML e clientes JEV/Dify executam no `.venv` oficial; LM Studio permanece no host. O ambiente de produção instala `requirements.txt`, enquanto o desenvolvimento local e a CI instalam `requirements-dev.txt`, que também fornece FLAML e as ferramentas de qualidade.
 
 ## 17. Limitações e avaliação honesta da Etapa 2
 

@@ -6,14 +6,17 @@ DEV_PRE_COMMIT := .venv/bin/pre-commit
 install-prod:
 	$(DEV_PYTHON) -m pip install -r requirements.txt
 
-install-ml: install-prod
-	$(DEV_PYTHON) -m pip install -r requirements-ml.txt
+install-ml: install-dev
+	@printf 'Machine Learning e FLAML já fazem parte de requirements-dev.txt\n'
 
 install-evals: install-prod
-	$(DEV_PYTHON) -m pip install -r requirements-evals.txt
+	@printf 'DeepEval já faz parte de requirements.txt; a avaliação live continua explícita.\n'
 
-install-dev: bootstrap-crewai
+install-dev:
+	./scripts/bootstrap-crewai.sh
 	$(DEV_PYTHON) -m pip install -r requirements-dev.txt
+	$(DEV_PYTHON) -m pip check
+	$(DEV_PYTHON) -c 'import sys; assert sys.version_info[:2] == (3, 11), "Use Python 3.11"'
 
 lint: install-dev
 	$(DEV_PRE_COMMIT) run --all-files

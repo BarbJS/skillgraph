@@ -32,10 +32,6 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
-            requirements-base.txt
-            requirements-ml.txt
-            requirements-crewai.txt
-            requirements-evals.txt
             requirements-dev.txt
             .github/workflows/release.yml
 

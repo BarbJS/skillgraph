@@ -22,13 +22,9 @@ Para o ambiente oficial de desenvolvimento, `make run` continua usando o launche
 
 ## Dependências do runtime web
 
-`requirements.txt` instala o perfil cloud-ready com:
+`requirements.txt` instala o runtime completo necessário pelo app publicado, incluindo Streamlit, CrewAI, inferência/XAI ML, Langfuse e a avaliação explícita DeepEval. A avaliação live não é chamada pelo chat normal.
 
-- runtime Streamlit/base;
-- CrewAI para as rotas multiagente;
-- dependências de inferência/XAI ML.
-
-As dependências de DeepEval e treinamento FLAML continuam separadas do fluxo web e ficam em `requirements-evals.txt`/workflow explícito de treinamento.
+`requirements-dev.txt` inclui o runtime de produção e acrescenta FLAML para o treinamento O*NET, além de pytest, pre-commit, Black e Ruff. O ambiente local completo deve usar somente esse arquivo adicional.
 
 ## Arquivos necessários no repositório
 

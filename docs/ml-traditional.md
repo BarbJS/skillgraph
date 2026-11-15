@@ -37,7 +37,7 @@ O O*NET não contém histórico individual de colaboradores. O perfil de um cola
 ## Execução
 
 ```bash
-make bootstrap-crewai
+make install-dev
 make bootstrap-flaml
 make train-ml
 make run

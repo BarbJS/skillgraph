@@ -1,11 +1,13 @@
 # Golden dataset do SkillGraph
 
-O golden dataset documenta e avalia somente as rotas da Etapa 1. O pipeline de Machine Learning pertence à Etapa 2; seus critérios estão em `docs/documentacao-completa-etapa2.md` e `docs/evaluation-ml.md`.
+O Golden Dataset documenta e avalia as rotas atuais do SkillGraph, incluindo segurança, RAG, dados estruturados, treinamento, Machine Learning, esclarecimento e casos multi-turno. Os cenários compostos de agentes ficam em `agent_goldens.jsonl`; a avaliação semântica do RAG fica em `rag_goldens.jsonl`.
 
-Para executar somente os testes da Etapa 1:
+As expectativas de rota devem acompanhar `src/agents/router.py`. O teste `tests/test_golden_dataset.py` executa o roteador real e falha quando uma entrada fica desatualizada.
+
+Para validar os datasets e as rotas atuais:
 
 ```bash
-pytest -q tests/test_golden_dataset.py tests/test_intent_router.py tests/test_security.py tests/test_sql_tools.py
+pytest -q tests/test_golden_dataset.py tests/test_agent_goldens.py tests/test_intent_router.py tests/test_security.py tests/test_sql_tools.py
 ```
 
 
@@ -55,4 +57,4 @@ O RAG do Dify continua sendo validado com o serviço local publicado e não é c
 - Consultas SQL devem retornar dados agregados ou consultas explicitamente solicitadas, sem expor linhas pessoais indevidas.
 - Consultas de competência devem descrever apenas os campos relacionais disponíveis, sem previsão ou classificação.
 - RAG deve citar documentos somente quando houver evidência.
-- O Machine Learning de competências não pertence ao golden dataset da Etapa 1; consulte a documentação da Etapa 2.
+- O caso precisa permanecer alinhado à rota atual; detalhes do pipeline de Machine Learning estão em `docs/documentacao-completa-etapa2.md` e `docs/evaluation-ml.md`.

@@ -1,3 +1,0 @@
-# Explicit evaluation-only dependencies; not needed for the production chat runtime.
--r requirements-base.txt
-deepeval==2.9.7

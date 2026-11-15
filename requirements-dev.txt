@@ -1,9 +1,13 @@
-# Development and CI environment: install all application capability groups plus tools.
--r requirements-crewai.txt
--r requirements-ml.txt
--r requirements-evals.txt
+# SkillGraph local development and CI dependencies
+# Includes the complete production runtime plus training, evaluation and tooling.
+-r requirements.txt
+
+# Reproducible O*NET/FLAML training workflow.
+flaml==2.7.0
+
+# Test, lint and formatting tools.
 pre-commit==4.3.0
 black==25.9.0
 ruff==0.13.0
 pytest==8.4.2
-pytest-cov>=4.1.0
+pytest-cov==6.3.0

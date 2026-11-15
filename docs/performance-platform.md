@@ -28,13 +28,10 @@ A medição varia com cache do sistema operacional, CPU, versão de Python, imag
 
 ## Perfis de dependências
 
-- `requirements.txt`: runtime base da aplicação.
-- `requirements-ml.txt`: inferência/XAI e treinamento O*NET/FLAML.
-- `requirements-crewai.txt`: runtime multiagente opcional.
-- `requirements-evals.txt`: DeepEval e avaliação explícita.
-- `requirements-dev.txt`: todos os grupos acima mais ferramentas de teste/lint.
+- `requirements.txt`: runtime pinado de produção, incluindo as rotas web, CrewAI, inferência ML, observabilidade e DeepEval para avaliação explícita.
+- `requirements-dev.txt`: runtime de produção mais FLAML para treinamento O*NET e ferramentas de teste, lint e pre-commit.
 
-Produção deve instalar apenas os grupos necessários para o serviço implantado. O chat base não precisa instalar DeepEval ou FLAML. Se o perfil implantado habilitar CrewAI ou Machine Learning, instale os grupos correspondentes.
+A produção deve instalar somente `requirements.txt`. O ambiente local de desenvolvimento e CI deve instalar somente `requirements-dev.txt`.
 
 ## Recomendações de plataforma
 

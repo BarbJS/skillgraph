@@ -1,469 +1,160 @@
 # 🧠 SkillGraph
 
-> Projeto acadêmico em desenvolvimento na disciplina **AI Factory: Building Intelligent Systems**, do curso de Inteligência Artificial da **PUCPR (2026)**.
+## Assistente inteligente para competências e aprendizagem corporativa
+
+> Projeto acadêmico desenvolvido na disciplina **AI Factory: Building Intelligent Systems**, do curso de Inteligência Artificial da **PUCPR**.
 >
-> Orientação: **Professor Wellington Rodrigo Monteiro**
-> Desenvolvimento: **Bárbara Jaeger Specian**, com assistência de Inteligência Artificial.
+> **Acesso ao protótipo publicado:** [skillgraph-z7dhxolnwrbssdmc79erp9.streamlit.app](https://skillgraph-z7dhxolnwrbssdmc79erp9.streamlit.app/)
 
-## 🎯 O que é o SkillGraph?
+![Interface principal do SkillGraph](docs/assets/interface.png)
 
-O **SkillGraph** é um assistente de competências e aprendizagem corporativa para a NexaTech, uma empresa fictícia de tecnologia e serviços. O projeto combina documentos, dados estruturados, modelos locais de linguagem, Machine Learning e agentes especializados para apoiar conversas de desenvolvimento profissional em Recursos Humanos.
+O **SkillGraph** é um protótipo de assistente inteligente para apoiar conversas de desenvolvimento profissional na NexaTech, uma empresa fictícia de tecnologia e serviços. Ele combina recuperação de informação, dados estruturados, Machine Learning, agentes especializados e observabilidade em uma única aplicação.
 
-O sistema ajuda a:
+> ⚠️ **Importante:** os dados da NexaTech são sintéticos. O SkillGraph é um protótipo acadêmico e não substitui avaliação humana, autenticação corporativa, decisões de RH ou políticas reais de privacidade.
 
-- consultar políticas, cargos, trilhas e treinamentos;
-- identificar lacunas agregadas de competências;
-- recomendar trilhas técnicas para um colaborador descrito sem PII;
-- sugerir treinamentos e pré-requisitos;
-- analisar currículos em PDF com foco em extrair competências e senioridade;
-- explicar as evidências e limitações das recomendações;
-- acompanhar rotas, agentes, ferramentas, latência e erros;
-- avaliar o comportamento do sistema com Golden Dataset e DeepEval.
+## 🎯 Problema e objetivos
 
-Os dados da NexaTech são sintéticos. O SkillGraph é um protótipo acadêmico e **não substitui avaliação humana, autenticação corporativa, decisões de RH ou políticas reais de privacidade**.
+Em organizações, informações sobre cargos, competências, trilhas, treinamentos e políticas costumam estar espalhadas em documentos e tabelas. Isso dificulta encontrar a fonte correta, comparar requisitos, identificar lacunas e indicar próximos passos de desenvolvimento de um colaborador.
 
-### Interface do SkillGraph via Streamlit
+O SkillGraph foi criado para:
 
-![Interface do SkillGraph via Streamlit](docs/assets/interface.png)
+- centralizar consultas sobre políticas, cargos, competências, trilhas e treinamentos;
+- calcular indicadores agregados em dados estruturados sem permitir SQL destrutivo;
+- recomendar trilhas técnicas a partir de um perfil descrito sem dados pessoais;
+- indicar prioridades de desenvolvimento, incerteza e competências não reconhecidas;
+- analisar currículos em PDF com extração textual e OCR local;
+- encaminhar cada pergunta para o agente e a ferramenta mais adequados;
+- apresentar fontes recuperadas, raciocínio estruturado público e feedback;
+- acompanhar latência, rotas, ferramentas, erros, tokens e custos quando disponíveis;
+- avaliar regressões com Golden Dataset e qualidade semântica com DeepEval.
 
-## 🧩 Desenvolvimento faseado: um único sistema integrado
+A grande ideia do projeto é tornar a gestão de competências e a aprendizagem corporativa mais orientadas por dados, evidências e inteligência artificial, mantendo transparência, privacidade e revisão humana.
 
-A Etapa 1 construiu a fundação conversacional e de segurança:
+## 🏗️ Arquitetura do sistema
 
-- Interface Streamlit com histórico, perfis simulados e feedback;
-- Roteador determinístico de intenções;
-- RAG com Chatflow Dify e armazenamento vetorial Weaviate;
-- Consultas read-only em DuckDB sobre CSVs relacionais;
-- Fontes recuperadas, tabelas, indicadores e gráficos;
-- Guardrails contra PII, prompt injection e SQL destrutivo.
+O sistema possui dois contextos operacionais. No desenvolvimento local, o Dify roda em Docker e utiliza o LM Studio para chat e embeddings. No deploy, o Streamlit é publicado na nuvem, o RAG usa Dify Cloud com Weaviate gerenciado e o modelo conversacional utiliza Gemini. As rotas, as ferramentas, os guardrails e os contratos permanecem no código do SkillGraph.
 
-Para conhecer em detalhes o desenvolvimento da Etapa 1, consulte a [documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md).
+![Diagrama de arquitetura do SkillGraph](docs/assets/diagrama-skillgraph.png)
 
-A Etapa 2 amplia essa fundação sem substituí-la:
+### Como uma pergunta percorre o sistema
 
-- Machine Learning tradicional com O*NET 31.0, FLAML e artefato PKL;
-- Recomendação de trilhas, prioridades, incerteza e explicabilidade;
-- Sistema multiagente com CrewAI e LM Studio;
-- Agentes especializados com ferramentas allowlisted;
-- Análise de currículo com PyMuPDF, OCR local e JEV opcional;
-- Observabilidade local e integração opcional com Langfuse;
-- Golden Dataset, testes automatizados e DeepEval como LLM-as-a-judge.
+1. A interface recebe uma mensagem, um perfil simulado ou um PDF.
+2. Os guardrails verificam PII, secrets, prompt injection, toxicidade, escopo e operações inseguras.
+3. O roteador determinístico escolhe uma única rota.
+4. A rota chama somente a ferramenta autorizada: Dify/RAG, DuckDB, PKL/XAI ou OCR/JEV.
+5. O resultado passa por contratos estruturados, revisão e output gate.
+6. A resposta é exibida com fontes, tabelas, indicadores, áudio e/ou raciocínio estruturado público, conforme o caso.
 
-O [relatório técnico da Etapa 2](docs/evaluation-etapa2.md) apresenta o dataset, as métricas, os agentes, a observabilidade e os resultados da avaliação.
+## 🧰 Stack detalhada
 
-🎥 [Assistir ao vídeo de demonstração da Etapa 2 no YouTube](https://youtu.be/2MAOLrRoTvI)
-
-Para saber como a Etapa 2 foi desenvolvida e integrada tecnicamente, consulte a [documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Em conjunto, o SkillGraph encaminha cada solicitação para a camada mais adequada: documentos, dados estruturados, Machine Learning ou uma rota multiagente. As duas etapas formam um único produto integrado.
-
-## 🔄 Como uma pergunta percorre o sistema
-
-```text
-Usuário
-  ↓
-Streamlit: chat, histórico, perfis e upload de PDF
-  ↓
-Guardrails: PII, prompt injection, escopo e operações inseguras
-  ↓
-Roteador de intenção
-  ├── RAG documental → Dify → Weaviate → LM Studio → resposta + fontes
-  ├── Dados estruturados → funções read-only → DuckDB → tabela/indicador
-  ├── Machine Learning → LM Studio interpreta → backend valida → PKL/XAI → trilhas
-  ├── CrewAI → Core Router Agent → agente especialista → ferramenta necessária → Reviewer Agent → Synthesizer Agent
-  └── Solicitação sensível → bloqueio antes de modelo ou banco
- ↓
-Resposta ao usuário
-```
-
-## 🏗️ Arquitetura e responsabilidades
-
-| Camada | Responsabilidade |
-|---|---|
-| Streamlit | Interface, histórico, perfis simulados, upload, respostas, tabelas, gráficos e painéis técnicos. |
-| Guardrails | Bloqueio de PII, prompt injection, decisões laborais e operações SQL inseguras. |
-| Roteador | Seleção determinística da intenção e da rota apropriada. |
-| Dify + Weaviate | RAG documental, recuperação de contexto, Chatflow e fontes. |
-| DuckDB | Consultas agregadas e read-only nos CSVs relacionais sintéticos. |
-| LM Studio | Modelo local de chat, interpretação ML, síntese e suporte ao CrewAI. |
-| ML/FLAML/PKL | Recomendação de trilhas e prioridades de competências. |
-| CrewAI | Orquestração de agentes por rota e handoffs estruturados. |
-| JEV | Integração opcional para sinais estruturados de currículo sanitizado. |
-| Langfuse | Tracing externo sanitizado e distribuído. |
-| Golden dataset/DeepEval | Testes automatizados e avaliação semântica de respostas. |
-
-### Sistema multiagente
-
-O CrewAI não fornece o LLM; ele orquestra o modelo local do LM Studio. Os agentes são selecionados por rota e não formam uma cadeia fixa para todas as perguntas:
-
-| Agente | Papel | Ferramenta |
+| Camada | Tecnologias | Responsabilidade |
 |---|---|---|
-| Core Router | Classificar intenção e escolher rota | Nenhuma |
-| Resume Interpreter | Interpretar currículo sanitizado | OCR/PyMuPDF + JEV via backend |
-| Profile Normalizer | Normalizar competências e remover PII | Nenhuma |
-| Prediction Specialist | Executar recomendação de trilhas | `CompetencyRecommendationTool` / PKL |
-| Gap Analyst | Interpretar lacunas | Estado estruturado |
-| Learning Path & Training Recommendation Agent | Consultar treinamentos e pré-requisitos | `TrainingCatalogTool` / DuckDB |
-| Competency & Development Specialist | Consultar competências, cargos, trilhas, treinamentos e políticas com fontes | `DifyRagTool` / Dify |
-| Structured Data Specialist | Consultar lacunas e indicadores agregados | `CompetencyGapTool` / DuckDB |
-| Safety Reviewer | Validar segurança, schema e evidências | Nenhuma |
-| Response Synthesizer | Redigir a resposta final | Nenhuma |
+| Interface | Streamlit, pandas | Chat, perfis simulados, histórico, feedback, upload, tabelas, gráficos e painéis técnicos. |
+| Roteamento e segurança | Python, roteador determinístico, guardrails, Pydantic, output gate | Seleção da rota, validação de entradas/saídas, bloqueio de PII, secrets, injection, toxicidade e decisões trabalhistas. |
+| RAG | Dify Chatflow, Weaviate gerenciado pelo Dify, Gemini em produção, LM Studio local | Recuperação de políticas, cargos, trilhas, treinamentos e FAQs com fontes. |
+| Dados estruturados | DuckDB, CSVs sintéticos | Indicadores agregados, catálogo de treinamentos e consultas read-only. |
+| Machine Learning | O*NET 31.0, FLAML, scikit-learn, LightGBM via FLAML, joblib/PKL, SHAP | Recomendação exploratória de trilhas, prioridades, incerteza e explicabilidade. |
+| Multiagentes | CrewAI, Core Router, especialistas, Safety Reviewer, Response Synthesizer | Handoffs por rota e uso de ferramentas com least privilege. |
+| Currículos | PyMuPDF, Tesseract/pytesseract, Pillow, JEV opcional | Extração de texto, OCR e estruturação sanitizada de competências. |
+| Modelo LLM local | LM Studio | Chat, embeddings e apoio aos agentes no desenvolvimento local. |
+| Modelo LLM produção | Gemini | Chatflow no Dify Cloud, CrewAI e síntese final de respostas elegíveis. |
+| Observabilidade | TraceContext, SpanContext, Langfuse Cloud opcional, Slack opcional | Traces sanitizados, latência, erros, tokens, custos e alertas. |
+| Avaliação | Golden Dataset, testes automatizados, DeepEval | Regressão de rotas e segurança; avaliação semântica live mediante confirmação. |
+| Execução local | Python 3.11, Docker Compose, Dify self-hosted | Ambiente completo de desenvolvimento e testes. |
+| Deploy | Streamlit Community Cloud, Secrets | Publicação do app e configuração segura de credenciais. |
 
-O painel **Raciocínio estruturado do agente** na resposta ao usuário, mostra somente resumos públicos dos agentes realmente usados, suas funções e ferramentas. Não exibe chain-of-thought ou prompts privados.
+## 💬 Perguntas para experimentar
 
-## 🚀 Como executar em uma máquina nova
+As perguntas abaixo representam fluxos testados ou previstos no projeto. Para perguntas que exigem serviços externos, confirme se Dify, Gemini, CrewAI, o artefato ML e JEV estão configurados.
+
+### Chat - RAG
+
+- **“Quantas horas de treinamento um funcionário sênior deve realizar por ano?”**
+- **“Treinamentos online contam para a carga horária anual?”**
+- **“Quais são os critérios básicos para participar de treinamentos?”**
+- **“Quais competências são recomendadas para um Analista de Dados Júnior?”**
+
+### Chat - Dados estruturados
+
+- **“Quais treinamentos estão disponíveis?”**
+- **“Quais treinamentos devo priorizar para um colaborador com lacuna em Python?”**
+- **“Qual é a situação da competência COMP003 do funcionário F0001?”**
+
+### Machine Learning
+
+- **“O colaborador da equipe de dados tem Python avançado e SQL intermediário. Qual trilha priorizar?”**
+- **“Quais competências o colaborador precisa desenvolver para migrar de software para Machine Learning?”**
+
+### Chat - Análise de Currículo
+
+Envie um PDF sintético e use: **“Analise este currículo para desenvolvimento profissional.”** O fluxo extrai competências, níveis, confiança, evidências e informações ausentes. O PDF é temporário e não deve conter nome, CPF, e-mail, telefone, endereço ou outras informações pessoais reais.
+
+### CHat - Segurança
+
+Também é possível demonstrar bloqueios com tentativas controladas, como pedir CPF, solicitar o system prompt, enviar uma chave de teste ou tentar executar `DELETE`. Essas entradas devem ser bloqueadas antes de chegar a uma ferramenta ou modelo.
+
+## 🚀 Como executar localmente
 
 ### Pré-requisitos
 
-- Docker Desktop com Docker Compose v2;
-- Python 3.11.x;
+- Python **3.11.x**;
 - Git e `curl`;
-- LM Studio com modelo de chat carregado;
-- modelo de embeddings compatível com `/v1/embeddings`;
-- memória e espaço para o modelo local e os containers Dify.
+- Docker Desktop com Docker Compose v2;
+- LM Studio com um modelo de chat e um modelo de embeddings;
+- Tesseract com `por` e/ou `eng` se for testar PDFs escaneados;
+- memória e espaço suficientes para os modelos e serviços locais.
 
-Verifique as ferramentas:
+Confira as versões:
 
 ```bash
+python3.11 --version
 docker --version
 docker compose version
 git --version
-python3 --version
 ```
 
-### 1. Configuração local
+### 1. Baixar o projeto e criar o ambiente
 
 ```bash
+git clone https://github.com/barbara.specian/skillgraph-proj.git
+cd skillgraph-proj
 cp env.example .env
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
+python -m pip check
 ```
 
-O `.env` é ignorado pelo Git e nunca deve ser publicado. Para ativar a Etapa 2 multiagente:
+No Windows PowerShell, ative o ambiente com `\.venv\Scripts\Activate.ps1`.
 
-```env
-CREWAI_ENABLED=true
-```
+### 2. Configurar o `.env`
 
-Para habilitar o tracing externo, use as três variáveis fornecidas pelo Langfuse e a flag da aplicação:
+O arquivo [env.example](env.example) contém comentários para cada grupo de configuração. Preencha somente os serviços que pretende usar:
 
-```env
-LANGFUSE_ENABLED=true
-LANGFUSE_PUBLIC_KEY=...
-LANGFUSE_SECRET_KEY=...
-LANGFUSE_BASE_URL=https://...
-```
+- `DIFY_API_KEY`: chave do Chatflow publicado no Dify;
+- `GEMINI_API_KEY`: chave da API Google Gemini usada na produção e na síntese final;
+- `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` e `LANGFUSE_BASE_URL`: três valores do projeto Langfuse para tracing externo;
+- `TYPESAFE_API_KEY`: somente se a análise de currículo com JEV estiver autorizada;
+- chaves de avaliação: somente para o DeepEval live, que pode consumir quota.
 
-### 2. LM Studio
+Nunca coloque chaves reais no Git ou no navegador. No Streamlit Cloud, use **Settings → Secrets**.
 
-Inicie o servidor local na porta `1234` e confirme os IDs expostos:
+### 3. Preparar o LM Studio
+
+1. Inicie o servidor local na porta `1234`.
+2. Carregue um modelo de chat e confirme o ID exposto em `/v1/models`.
+3. Configure `LM_STUDIO_CHAT_MODEL` e `LM_STUDIO_EMBEDDING_MODEL` com IDs existentes.
+4. Execute:
 
 ```bash
 make check
 make test
 ```
 
-O modelo de chat e o modelo de embeddings são responsabilidades diferentes. O primeiro gera respostas; o segundo transforma documentos e perguntas em vetores.
+### 4. Preparar o Dify local
 
-### 3. Dify
+Para executar o ambiente self-hosted de desenvolvimento:
 
 ```bash
 make bootstrap
@@ -471,237 +162,148 @@ make up
 make smoke
 ```
 
-Acesse `http://localhost/install`, configure o provider LM Studio, cadastre chat e embeddings e publique o Chatflow. Consulte [docs/model-setup.md](docs/model-setup.md).
+Acesse `http://localhost`, configure o provider LM Studio, envie os quatro documentos de `documents_rag/`, crie a Knowledge Base, publique o Chatflow e configure `DIFY_API_BASE_URL`, `DIFY_API_KEY` e `DIFY_USER_ID` no `.env`.
 
-### 4. Dependências e Machine Learning
-
-Os perfis de dependência são separados para reduzir o tamanho do runtime:
-
-- `requirements.txt`: produção base;
-- `requirements-crewai.txt`: runtime multiagente;
-- `requirements-ml.txt`: inferência, XAI e treinamento O*NET/FLAML;
-- `requirements-evals.txt`: DeepEval;
-- `requirements-dev.txt`: todos os grupos e ferramentas de desenvolvimento.
-
-Para executar o app em uma plataforma cloud que injeta `PORT`:
+### 5. Preparar o artefato de Machine Learning
 
 ```bash
-make run-cloud
-```
-
-O launcher cloud escuta em `0.0.0.0` e usa `PORT` (fallback local `8501`). Consulte [docs/cloud-readiness.md](docs/cloud-readiness.md). Os providers locais (Dify/LM Studio/JEV) ainda precisam de URLs acessíveis externamente e serão configurados na próxima etapa.
-
-Para o ambiente completo de desenvolvimento:
-
-```bash
-make bootstrap-crewai
-make bootstrap-flaml
 make train-ml
 ```
 
-Para um runtime base sem treinamento, CrewAI e DeepEval:
+O comando gera `.ml_artifacts/skillgraph_competency_tracks.pkl`. O artefato validado é usado somente para inferência; o treinamento não ocorre durante uma pergunta.
 
-```bash
-make install-prod
-```
-
-Adicione somente os grupos necessários ao serviço implantado com `make install-ml`, `make install-evals` ou a instalação correspondente do ambiente.
-
-O benchmark de tempo e memória do processo está em `scripts/benchmark-performance.py`; consulte [docs/performance-platform.md](docs/performance-platform.md).
-
-```bash
-.venv/bin/python scripts/benchmark-performance.py --runs 3
-```
-
-
-O treinamento gera o artefato local `.ml_artifacts/skillgraph_competency_tracks.pkl`.
-
-### 5. Executar
+### 6. Iniciar a aplicação
 
 ```bash
 CREWAI_ENABLED=true make run
 ```
 
-A aplicação ficará em `http://localhost:8501`.
-
-## 📚 Fluxos para experimentar
-
-### RAG legado
-
-```text
-Qual é a carga horária de um cargo sênior?
-```
-
-Fluxo: roteador legado → Dify/Weaviate → resposta com fonte.
-
-### Dados estruturados e CrewAI
-
-```text
-Quais competências têm mais lacunas?
-```
-
-Com CrewAI habilitado: Core Router → Structured Data Specialist → `CompetencyGapTool` → Safety Reviewer → Response Synthesizer.
-
-### Treinamentos e CrewAI
-
-```text
-Quais treinamentos devo priorizar para um colaborador com lacuna em Python?
-```
-
-Fluxo: Core Router → Learning Path Agent → `TrainingCatalogTool` → Reviewer → Synthesizer.
-
-### Política e CrewAI
-
-```text
-Quais regras de reembolso se aplicam a este treinamento?
-```
-
-Fluxo: Core Router → Competency & Development Specialist → `DifyRagTool` → Reviewer → Synthesizer.
-
-### Currículo e JEV opcional
-
-Envie um PDF sintético com:
-
-```text
-Analise este currículo para desenvolvimento profissional.
-```
-
-Fluxo: PDF temporário → PyMuPDF/OCR local → sanitização → JEV opcional → Resume Interpreter → Profile Normalizer → Reviewer → Synthesizer. Após o upload, a interface mostra o método (`texto nativo` ou `OCR local`) e pede confirmação em **Enviar análise**; o PDF e seus bytes não ficam no estado da sessão.
-
-Para PDFs escaneados, o Tesseract precisa estar instalado e o idioma configurado em `OCR_LANG` (o padrão é `eng`). No ambiente local, confirme `tesseract --list-langs`; se `por` não aparecer, use `OCR_LANG=eng` ou instale o pacote de português. `OCR_MAX_PAGES` limita o custo do OCR e `RESUME_MAX_SIZE_MB` limita o upload.
-
-O JEV é executado uma única vez pelo backend depois da extração e redação de PII. `JEV_ENABLED=true` e `TYPESAFE_API_KEY` habilitam a chamada; sem isso, a análise estruturada é interrompida com diagnóstico explícito, sem fingir sucesso. O texto bruto do currículo nunca é enviado para a resposta final ou para a observabilidade.
-
-Diagnóstico rápido antes de usar um PDF real:
+Acesse [http://localhost:8501](http://localhost:8501). Para executar somente o launcher compatível com cloud:
 
 ```bash
-.venv/bin/python -m pytest -q tests/test_resume_extractor.py tests/test_resume_upload.py tests/test_jev_client.py
-.venv/bin/python -m streamlit run app.py
+make run-cloud
 ```
 
-Comece com um PDF textual sintético; depois teste um PDF escaneado. A etapa JEV live não deve ser executada em teste sem uma credencial autorizada.
-
-### Síntese final obrigatória com Gemini
-
-O CrewAI e os agentes continuam usando o LM Studio local. Se a demonstração precisar mostrar tokens e custo de uma API externa no Langfuse, habilite somente a síntese final com Gemini:
-
-```env
-GEMINI_API_KEY=sua-chave-local
-GEMINI_MODEL=gemini-3.1-flash-lite
-GEMINI_MAX_ATTEMPTS=1
-GEMINI_ALLOW_FALLBACK=false
-```
-
-Essa etapa recebe apenas o rascunho e os dados estruturados sanitizados; não recebe PDF, bytes, currículo bruto, PII ou resposta bruta do JEV. Toda resposta elaborada deve passar pelo Gemini; se a chave faltar ou a API falhar, a execução é interrompida com diagnóstico, sem apresentar o rascunho local como resposta final. O uso do Gemini aparece no trace como `gemini.final_synthesis`; tokens vêm do `usageMetadata` da API. O custo só é calculado quando as tarifas `GEMINI_INPUT_USD_PER_1M` e `GEMINI_OUTPUT_USD_PER_1M` forem configuradas. O LLM-as-a-judge permanece separado e não é alterado.
-
-### Machine Learning
-
-```text
-O colaborador da equipe de dados tem Python avançado, SQL intermediário e está começando em IA generativa. Qual trilha priorizar?
-```
-
-Use a área **Machine Learning** para visualizar trilhas, prioridades, incerteza e explicabilidade.
-
-## 📊 Observabilidade e avaliação
-
-O perfil Desenvolvedor possui a funcionalidade principal de chat e as funcionalidades:
-
-- **Machine Learning:** métricas, cobertura, incerteza e XAI;
-- **Observabilidade:** traces locais, rotas, spans, latência, tokens, custos, serviços e erros;
-- **Qualidade e Evals:** Golden Dataset e relatórios DeepEval.
-
-O Golden Dataset principal possui 25 casos. `evals/rag_goldens.jsonl` possui 12 casos com resposta, contexto e ground truth para o runner live. O DeepEval mede Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall. A última execução registrada avaliou 12 casos, com médias 0,9514, 0,9236, 1,0000 e 0,8810, respectivamente, e pass rate de 100%; as weaknesses continuam documentadas no relatório técnico.
-
-Execute a avaliação offline com:
+### 7. Executar testes e avaliações
 
 ```bash
+python -m pytest -q tests
+make lint
+make ci
 make evaluate-ai
 ```
 
-Para a avaliação live, que pode consumir tokens:
+A avaliação live do RAG é opcional e pode consumir quota do Gemini:
 
 ```bash
-.venv/bin/python scripts/evaluate-ai-live.py \
+python scripts/evaluate-ai-live.py \
   --deepeval \
   --yes-live \
   --dataset evals/rag_goldens.jsonl \
   --output output/evaluation/live_ai_report.json
 ```
 
-Para validar a conexão Langfuse sem expor chaves:
+## ☁️ Deploy atual
+
+O app publicado utiliza Streamlit Community Cloud. A configuração de produção deve conter os secrets necessários para:
+
+- Dify Cloud: `DIFY_API_BASE_URL`, `DIFY_API_KEY`, `DIFY_USER_ID`;
+- Gemini: `GEMINI_API_KEY`, `GEMINI_MODEL`;
+- CrewAI: `CREWAI_ENABLED=true`, `CREWAI_LLM_MODEL`, `CREWAI_LLM_API_KEY` e endpoint compatível;
+- Langfuse: `LANGFUSE_ENABLED=true` e as três configurações do projeto, quando o tracing externo for desejado;
+- JEV: somente com credencial autorizada;
+- artefato ML: `.ml_artifacts/skillgraph_competency_tracks.pkl` versionado ou disponibilizado por mecanismo externo.
+
+O LM Studio e o Docker Dify são usados no desenvolvimento local. Eles não são acessados pelo app publicado. O health check do Streamlit é `/_stcore/health` e pode ser testado com:
 
 ```bash
-.venv/bin/python scripts/validate-langfuse-connection.py
+python scripts/cloud-smoke-test.py https://skillgraph-z7dhxolnwrbssdmc79erp9.streamlit.app
 ```
 
-## 🧪 Testes e qualidade de código
+## 🛡️ Segurança e privacidade
 
-```bash
-.venv/bin/python -m pytest -q tests
-make lint
-make ci
-```
+- Não envie nomes, CPF, RG, e-mail, telefone, endereço, salário individual ou secrets.
+- Currículos são temporários e sanitizados antes de integrações externas.
+- DuckDB e ferramentas dos agentes operam em allowlist/read-only.
+- A resposta final passa por validação de PII, secrets, prompt leakage, toxicidade e decisões trabalhistas.
+- Logs e Langfuse recebem somente metadados sanitizados.
+- O painel de raciocínio mostra etapas públicas, nunca chain-of-thought ou prompts privados.
+- Recomendações de trilhas são exploratórias e exigem revisão humana.
 
-A suíte cobre roteamento, guardrails, Dify/SSE, DuckDB read-only, ML/PKL/XAI, CrewAI, JEV mockado, PDF/OCR, estado multi-turno, observabilidade, Langfuse sanitizado, dashboard, Golden Dataset e UI.
+## 📊 Avaliação e qualidade
 
-## 🛡️ Segurança, privacidade e limites
+O repositório contém três conjuntos complementares:
 
-### Decisão sobre LLM Guard
+- `evals/golden_dataset.jsonl`: 25 casos determinísticos de rotas, segurança, dados estruturados, ML, treinamento e ambiguidades;
+- `evals/agent_goldens.jsonl`: contratos de cenários multiagente;
+- `evals/rag_goldens.jsonl`: 12 perguntas com resposta, contexto e ground truth para DeepEval.
 
-O projeto avaliou e tentou integrar o **LLM Guard** como uma camada complementar de segurança para prompt injection, jailbreak, PII, secrets e toxicidade. A integração não foi mantida no ambiente oficial porque suas dependências transitivas entraram em conflito com versões obrigatórias do CrewAI, DeepEval e componentes do stack de ML, especialmente `json-repair`, `click`, `numpy`, `regex` e pacotes relacionados ao spaCy. Manter o LLM Guard nessas condições reduziria a reprodutibilidade e poderia quebrar o runtime principal.
-
-Por essa razão, o LLM Guard foi removido do código, das dependências e da execução da aplicação neste momento. Em seu lugar, os guardrails determinísticos foram fortalecidos: a aplicação mantém bloqueios de PII, prompt injection, jailbreak, secrets, toxicidade, SQL destrutivo e decisões trabalhistas; adicionou uma camada central de validação de saída; ampliou a detecção de tokens e credenciais; e mantém casos sintéticos de segurança no Golden Dataset para regressão periódica. Essa decisão é explícita e reversível: uma futura adoção deverá ocorrer em ambiente isolado ou quando houver uma combinação de versões compatível, sem contaminar o ambiente oficial.
-
-O DeepEval permanece ativo para avaliação semântica de qualidade — Faithfulness, Answer Relevancy, Contextual Precision e Contextual Recall — mas não é usado como bloqueio de segurança online.
-
-
-- `.env`, `.dify/`, bancos, logs, modelos e artefatos locais não fazem parte do pacote público;
-- chaves do Dify, JEV e Langfuse nunca devem ser commitadas;
-- perguntas com PII, prompt injection e SQL destrutivo são bloqueadas;
-- DuckDB e ferramentas de agentes são read-only/allowlisted;
-- currículo bruto é temporário e sanitizado antes do JEV;
-- logs e Langfuse recebem somente metadados agregados;
-- perfis são simulações e não há autenticação/RBAC real;
-- recomendações ML não são decisões de emprego;
-- dados da NexaTech são sintéticos;
-- tokens e custos podem não estar disponíveis em providers locais; quando ausentes, o sistema informa '0' ou estima tokens sem inventar custo.
+A última execução live registrada avaliou 12 casos RAG, com médias documentadas de Faithfulness `0,9514`, Answer Relevancy `0,9236`, Contextual Precision `1,0000` e Contextual Recall `0,8810`. Esses resultados são evidências complementares e não substituem revisão humana.
 
 ## 📁 Organização do repositório
 
 ```text
 .
-├── app.py                         # interface integrada Streamlit
-├── config/                        # referências do Chatflow e perguntas JEV
-├── data_bd/                       # CSVs relacionais sintéticos
-├── documents_rag/                 # corpus documental
-├── docs/                          # documentação e relatório técnico
-├── evals/                         # Golden Dataset e casos semânticos
-├── scripts/                       # bootstrap, avaliação e diagnóstico
-├── src/                           # ML, agentes, RAG, SQL, JEV e observabilidade
-├── tests/                         # testes automatizados
-├── env.example                    # configuração sem segredos
-├── Makefile                       # comandos operacionais
-└── requirements.txt               # dependências Python
+├── app.py                         # aplicação Streamlit
+├── src/                          # agentes, RAG, ML, segurança e observabilidade
+├── data_bd/                      # CSVs relacionais sintéticos
+├── documents_rag/                # corpus documental do RAG
+├── evals/                        # Golden Datasets e instruções de avaliação
+├── tests/                        # testes automatizados
+├── scripts/                      # bootstrap, treino, smoke tests e avaliações
+├── docs/                         # documentação técnica e análise crítica
+├── config/                       # referências do Dify e perguntas JEV
+├── requirements.txt              # dependências pinadas de produção
+├── requirements-dev.txt          # produção + treino, testes e lint
+├── env.example                   # configuração documentada sem segredos
+├── Makefile                      # comandos operacionais
+└── .streamlit/                   # configuração visual do Streamlit
 ```
 
-## 🧰 Documentação
+## ⚠️ Limitações e próximos passos
 
+O SkillGraph continua sendo um MVP acadêmico. As principais limitações são:
+
+- dados de negócio, documentos e avaliações ainda são sintéticos;
+- o dataset O*NET filtrado é pequeno e não representa integralmente o mercado brasileiro;
+- o modelo apresenta diferença relevante entre validação e teste;
+- não há autenticação corporativa ou RBAC real;
+- SQLite, logs e caches do Streamlit Cloud não são persistência empresarial;
+- OCR, JEV, Dify Cloud, Gemini e Langfuse dependem de configuração e quota;
+- guardrails determinísticos não garantem cobertura contra todos os ataques;
+- ainda faltam testes adversariais conduzidos por especialistas em segurança;
+- o corpus RAG precisa de documentos reais, atuais e autorizados;
+- o Golden Dataset precisa crescer com casos reais de RH e rotas multiagente;
+- não são aceitas imagens, planilhas e outros formatos de documentos de forma estruturada.
+
+Próximas evoluções recomendadas:
+
+1. adicionar autenticação, RBAC, persistência durável e governança de documentos;
+2. ampliar o dataset com universidades, associações e dados anonimizados autorizados;
+3. revisar o modelo com especialistas de RH, fairness e validação no contexto brasileiro;
+4. substituir ou complementar o corpus sintético por fontes institucionais reais;
+5. evoluir RAG com reranking, metadados, busca híbrida e detecção de ausência de evidência;
+6. modernizar a interface, adicionar streaming de status, entrada multimodal e mais formatos;
+7. executar testes de carga e avaliações independentes de segurança.
+
+## 📚 Documentação
+
+- [Análise crítica da Etapa 3](docs/analise-critica-etapa3.md)
 - [Documentação completa da Etapa 1](docs/documentacao-completa-etapa1.md)
 - [Documentação completa da Etapa 2](docs/documentacao-completa-etapa2.md)
+- [Documentação completa da Etapa 3](docs/documentacao-completa-etapa3.md)
 - [Relatório técnico da Etapa 2](docs/evaluation-etapa2.md)
+- [Decisões de arquitetura RAG](docs/rag-architecture-decisions.md)
+- [Preparação para cloud](docs/cloud-readiness.md)
+- [Configuração Dify e LM Studio](docs/model-setup.md)
+- [Fluxos multiagente](docs/agent-flows.md)
 - [Machine Learning tradicional](docs/ml-traditional.md)
 - [Integração LLM → PKL](docs/ml-llm-integration.md)
 - [Avaliação do modelo ML](docs/evaluation-ml.md)
-- [XAI](docs/xai-ml.md)
-- [CrewAI e agentes](docs/agents-crewai.md)
-- [Fluxos multiagente](docs/agent-flows.md)
-- [Configuração Dify/LM Studio](docs/model-setup.md)
 - [Observabilidade](docs/observability.md)
 - [Avaliação robusta de IA](docs/evaluation-ai.md)
-- [Arquitetura RAG](docs/rag-architecture-decisions.md)
+- [Instruções dos datasets](evals/README.md)
 
-## 🔖 Versão e próximos passos
+## 📝 Licença e versão
 
-A versão corrente está em [VERSION](VERSION) e as mudanças em [CHANGELOG.md](CHANGELOG.md). O projeto usa Python 3.11 como runtime oficial.
-
-O SkillGraph ainda é um MVP acadêmico. A Etapa 3 pode ampliar o dataset e o corpus, validar as recomendações com especialistas, adicionar autenticação e RBAC reais, formalizar retenção e governança e realizar testes de carga.
+Consulte [LICENSE](LICENSE), [VERSION](VERSION) e [CHANGELOG.md](CHANGELOG.md) para informações de licença, versão e histórico de mudanças.
