@@ -156,6 +156,43 @@ def test_training_catalog_questions_use_training_specialist():
     assert route_turn("Quais cursos existem no catálogo?") is AgentRoute.TRAINING
 
 
+def test_catalog_question_returns_duckdb_rows_without_employee_profile(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "true")
+    rows = [
+        {
+            "titulo": "Python Fundamentos",
+            "competencia": "Python",
+            "duracao_horas": 20,
+            "modalidade": "Online",
+            "custo": 500,
+            "certificacao": True,
+        },
+        {
+            "titulo": "Python Intermediario",
+            "competencia": "Python",
+            "duracao_horas": 30,
+            "modalidade": "Online",
+            "custo": 800,
+            "certificacao": True,
+        },
+    ]
+    monkeypatch.setattr("src.agents.runtime.training_catalog_tool", lambda database, competency=None: rows)
+    monkeypatch.setattr(
+        "src.agents.runtime.build_route_crew",
+        lambda route, tools: (_ for _ in ()).throw(AssertionError("catálogo não deve iniciar CrewAI")),
+    )
+
+    result = run_agent_turn("Quais treinamentos estão disponíveis no catálogo para a competência Python?")
+
+    assert result["status"] == "completed"
+    assert result["route"] == AgentRoute.TRAINING.value
+    assert result["profile"] is None
+    assert result["synthesis"]["provider"] == "duckdb"
+    assert "Python Fundamentos" in result["answer"]
+    assert "senioridade" not in result["answer"].casefold()
+    assert result["table_rows"] == rows
+
+
 def test_runtime_structured_route_wires_gap_tool(monkeypatch):
     monkeypatch.setenv("CREWAI_ENABLED", "true")
     monkeypatch.setattr(

@@ -58,6 +58,60 @@ def _select_rag_payload(
     return dict(rag_cache) if isinstance(rag_cache, dict) else {}
 
 
+_CATALOG_MARKERS = (
+    "catálogo",
+    "catalogo",
+    "disponível",
+    "disponivel",
+    "disponíveis",
+    "disponiveis",
+    "lista",
+    "existem",
+)
+
+
+def _is_catalog_query(message: str) -> bool:
+    """Recognize a catalog lookup that must not require an employee profile."""
+    normalized = " ".join(str(message or "").casefold().split())
+    return bool(
+        _contains_any_catalog_marker(normalized)
+        and any(term in normalized for term in ("treinamento", "treinamentos", "curso", "cursos"))
+    )
+
+
+def _contains_any_catalog_marker(normalized: str) -> bool:
+    return any(marker in normalized for marker in _CATALOG_MARKERS)
+
+
+def _catalog_competency(message: str) -> str | None:
+    """Extract a simple competency filter from a catalog question."""
+    match = re.search(
+        r"(?:compet[eê]ncia|habilidade)(?:\s+de)?\s+([\wÀ-ÿ][\wÀ-ÿ+.-]*)",
+        str(message or ""),
+        re.IGNORECASE,
+    )
+    return match.group(1).strip() if match else None
+
+
+def _render_training_catalog(rows: list[dict[str, Any]], competency: str | None) -> str:
+    """Render only read-only catalog rows, without profile or model language."""
+    subject = f" para a competência {competency}" if competency else ""
+    if not rows:
+        return f"Não encontrei treinamentos disponíveis{subject} no catálogo autorizado."
+    lines = [f"Treinamentos disponíveis{subject}:", ""]
+    for row in rows:
+        title = str(row.get("titulo") or "Treinamento sem título")
+        details = []
+        if row.get("duracao_horas") is not None:
+            details.append(f"{row['duracao_horas']} horas")
+        if row.get("modalidade"):
+            details.append(str(row["modalidade"]))
+        if row.get("certificacao") is not None:
+            details.append("com certificação" if row["certificacao"] else "sem certificação")
+        lines.append(f"- **{title}**" + (f" — {', '.join(details)}." if details else "."))
+    return "\n".join(lines)
+
+
 
 def _ml_deterministic_draft(profile: dict[str, Any], prediction: dict[str, Any]) -> str:
     """Build a dynamic, model-grounded ML draft before Gemini wording."""
@@ -266,6 +320,27 @@ def run_agent_turn(
                 ensure_ascii=False,
                 default=str,
             )
+
+        if route == AgentRoute.TRAINING and _is_catalog_query(message):
+            competency = _catalog_competency(message)
+            rows = _trace_tool(
+                "tool.training_catalog",
+                "duckdb",
+                "TrainingCatalogTool",
+                lambda: training_catalog_tool(database, competency),
+            )
+            return {
+                "status": "completed",
+                "route": route.value,
+                "answer": _render_training_catalog(rows, competency),
+                "profile": None,
+                "structured": None,
+                "table_rows": rows,
+                "sources": [],
+                "reasoning": sanitize_steps(agent_execution_steps(route.value)),
+                "synthesis": {"provider": "duckdb", "preserved": True, "fallback": False},
+                "state_patch": {"last_route": route.value},
+            }
 
         def competency_gap_tool() -> str:
             """Query aggregate competency gaps from read-only DuckDB."""

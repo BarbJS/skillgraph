@@ -185,7 +185,12 @@ def build_route_crew(
         elif role == "Gap Analyst":
             description = "Analise somente prediction e employee_profile disponíveis e devolva lacunas estruturadas."
         elif role == "Learning Path & Training Recommendation Agent":
-            description = "Consulte somente o catálogo DuckDB allowlisted para as prioridades do estado."
+            description = (
+                "Se a mensagem pedir uma lista ou consulta de catálogo, sem colaborador, perfil ou lacuna, "
+                "consulte TrainingCatalogTool e retorne somente as linhas encontradas (título, competência, "
+                "duração, modalidade, custo, certificação e pré-requisito). Não avalie senioridade, confiança "
+                "ou competências de pessoa. Para recomendações contextuais, use somente prioridades do estado."
+            )
         elif role == "Competency & Development Specialist":
             description = "Responda diretamente à pergunta documental usando somente DifyRagTool. Preserve answer textual, sources, supported e conflitos."
         elif role == "Competency Lookup Specialist":
