@@ -51,33 +51,12 @@ def _preserve_rag_answer(canonical: str, synthesized: str, payload: dict[str, An
     return candidate
 
 
-def _task_payload(output: Any) -> dict[str, Any]:
-    """Decode one CrewAI task output without treating prose as structured data."""
-    candidate = getattr(output, "raw", output)
-    if isinstance(candidate, str):
-        try:
-            candidate = json.loads(candidate)
-        except json.JSONDecodeError:
-            return {}
-    return candidate if isinstance(candidate, dict) else {}
-
-
 def _select_rag_payload(
-    tasks_output: list[Any],
     rag_cache: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Select the Dify payload, never a later review-only paraphrase."""
-    if isinstance(rag_cache, dict) and (rag_cache.get("answer") or rag_cache.get("sources")):
-        return dict(rag_cache)
+    """Return only the preloaded Dify payload for the RAG route."""
+    return dict(rag_cache) if isinstance(rag_cache, dict) else {}
 
-    # A RAG crew has [Core, Specialist, Safety Reviewer].  If a test double
-    # omits the core task, accept its first structured payload as a fallback.
-    candidates = tasks_output[1:-1] if len(tasks_output) >= 3 else tasks_output
-    for output in candidates:
-        candidate = _task_payload(output)
-        if candidate.get("answer") or candidate.get("sources"):
-            return candidate
-    return {}
 
 
 def _ml_deterministic_draft(profile: dict[str, Any], prediction: dict[str, Any]) -> str:
@@ -231,6 +210,13 @@ def run_agent_turn(
 
         prediction_cache: str | None = None
         rag_cache: dict[str, Any] | None = None
+        if route == AgentRoute.RAG:
+            rag_cache = _trace_tool(
+                "tool.rag",
+                "dify",
+                "DifyRagTool",
+                lambda: retrieve_rag_tool(dify, message),
+            )
 
         def prediction_tool(profile_json: str) -> str:
             """Run the persisted competency PKL exactly once for a validated profile."""
@@ -302,12 +288,7 @@ def run_agent_turn(
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
             if rag_cache is None:
-                rag_cache = _trace_tool(
-                    "tool.rag",
-                    "dify",
-                    "DifyRagTool",
-                    lambda: retrieve_rag_tool(dify, message),
-                )
+                raise RuntimeError("A resposta canônica do Dify não foi carregada.")
             return json.dumps(rag_cache, ensure_ascii=False, default=str)
 
         def lookup_tool() -> str:
@@ -388,7 +369,7 @@ def run_agent_turn(
         table_rows: list[dict[str, Any]] = []
         sources: list[dict[str, Any]] = []
         rag_payload: dict[str, Any] = (
-            _select_rag_payload(tasks_output, rag_cache)
+            _select_rag_payload(rag_cache)
             if route == AgentRoute.RAG
             else {}
         )

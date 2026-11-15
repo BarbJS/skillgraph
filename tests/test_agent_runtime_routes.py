@@ -54,17 +54,15 @@ def test_rag_payload_prefers_direct_dify_result_over_review_paraphrase():
     ]
     direct = {"answer": "Resposta completa retornada pelo Dify.", "sources": [{"document": "politica_treinamentos.md"}]}
 
-    assert _select_rag_payload(tasks, direct) == direct
+    assert _select_rag_payload(direct) == direct
 
 
-def test_rag_payload_ignores_reviewer_when_direct_result_is_unavailable():
-    tasks = [
-        {"intent": "competency_development_rag"},
-        {"answer": "Resposta completa do especialista.", "sources": [{"document": "politica_treinamentos.md"}]},
-        {"answer": "Resumo incorreto do revisor.", "sources": [{"document": "politica_treinamentos.md"}]},
-    ]
+def test_rag_payload_is_empty_without_preloaded_dify_result():
+    assert _select_rag_payload(None) == {}
 
-    assert _select_rag_payload(tasks, None)["answer"] == "Resposta completa do especialista."
+
+def test_rag_payload_does_not_accept_review_or_specialist_fallbacks():
+    assert _select_rag_payload({"answer": "Resposta completa do Dify."})["answer"] == "Resposta completa do Dify."
 
 
 class _RagExactQueryCrew:
@@ -85,6 +83,30 @@ class _RagExactQueryCrew:
                 "__str__": lambda self: "Resposta não estruturada",
             },
         )()
+
+
+def test_rag_prefetch_occurs_before_crew_and_only_once(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "true")
+    monkeypatch.setenv("DIFY_API_KEY", "synthetic")
+    events = []
+
+    def fake_retrieve(client, question):
+        events.append(("dify", question))
+        return {"answer": "Resposta integral do Dify.", "sources": [{"document": "politica_treinamentos.md"}]}
+
+    class Crew:
+        def kickoff(self, *, inputs):
+            events.append(("crew", None))
+            return type("Result", (), {"tasks_output": [], "__str__": lambda self: "resumo do LLM"})()
+
+    monkeypatch.setattr("src.agents.runtime.retrieve_rag_tool", fake_retrieve)
+    monkeypatch.setattr("src.agents.runtime.build_route_crew", lambda route, tools: Crew())
+
+    result = run_agent_turn("pergunta original")
+
+    assert result["status"] == "completed"
+    assert result["answer"] == "Resposta integral do Dify."
+    assert events == [("dify", "pergunta original"), ("crew", None)]
 
 
 def test_rag_runtime_uses_exact_original_question_and_direct_payload(monkeypatch):
@@ -254,6 +276,15 @@ def test_rag_runtime_preserves_answer_and_sources(monkeypatch):
 def test_runtime_policy_wires_dify_tool(monkeypatch):
     monkeypatch.setenv("CREWAI_ENABLED", "true")
     monkeypatch.setenv("DIFY_API_KEY", "synthetic")
+    monkeypatch.setattr(
+        "src.agents.runtime.retrieve_rag_tool",
+        lambda client, question: {
+            "answer": "Resposta de teste do Dify.",
+            "sources": [{"document": "politica_treinamentos.md"}],
+            "supported": True,
+            "source_type": "dify",
+        },
+    )
     monkeypatch.setattr(
         "src.agents.runtime.build_route_crew",
         lambda route, tools: _PolicyFakeCrew(route, tools),
