@@ -12,6 +12,7 @@ def test_versioned_ml_artifact_runtime_dependencies_are_declared():
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     assert "flaml==2.7.0" in requirements
     assert "lightgbm==4.6.0" in requirements
+    assert "xgboost==2.1.4" in requirements
 
 
 def test_versioned_ml_artifact_loads_when_runtime_dependencies_are_available():
