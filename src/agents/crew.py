@@ -148,11 +148,12 @@ def build_route_crew(
 
     core = agent("Core Router", "core", "Orquestrar a rota selecionada e coordenar os handoffs com segurança.")
     reviewer = agent("Safety Reviewer", "reviewer", "Revisar segurança, evidências e escopo.")
-    synthesizer_prompt = {
-        "ml_prediction": "prediction_synthesizer",
-        "competency_development_rag": "rag_synthesizer",
-    }.get(route, "synthesizer")
-    synthesizer = agent("Response Synthesizer", synthesizer_prompt, "Redigir a resposta final baseada nos JSONs revisados.")
+    synthesizer = None
+    if route != "competency_development_rag":
+        synthesizer_prompt = {
+            "ml_prediction": "prediction_synthesizer",
+        }.get(route, "synthesizer")
+        synthesizer = agent("Response Synthesizer", synthesizer_prompt, "Redigir a resposta final baseada nos JSONs revisados.")
 
     tasks: list[Any] = [
         Task(
@@ -219,14 +220,18 @@ def build_route_crew(
         )
 
     if route == "competency_development_rag":
+        specialist_task = tasks[-2]
         reviewer_task = tasks[-1]
-        reviewer_task.context = [tasks[-1]]
+        specialist_task.context = [tasks[0]]
+        reviewer_task.context = [specialist_task]
         return Crew(
             agents=[task.agent for task in tasks],
             tasks=tasks,
             process=Process.sequential,
             verbose=False,
         )
+
+    assert synthesizer is not None
 
     core_task = tasks[0]
     specialist_tasks = tasks[1:-2]

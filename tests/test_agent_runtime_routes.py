@@ -1,6 +1,118 @@
-from src.agents.crew import route_agent_roles
+from src.agents.crew import build_route_crew, route_agent_roles
 from src.agents.router import AgentRoute, route_turn
-from src.agents.runtime import run_agent_turn
+from src.agents.runtime import _select_rag_payload, run_agent_turn
+
+
+def test_rag_crew_wires_specialist_into_safety_reviewer(monkeypatch):
+    class FakeAgent:
+        def __init__(self, **kwargs):
+            self.role = kwargs["role"]
+
+    class FakeTask:
+        def __init__(self, *, description, expected_output, agent):
+            self.description = description
+            self.expected_output = expected_output
+            self.agent = agent
+            self.context = None
+
+    class FakeCrew:
+        def __init__(self, *, agents, tasks, process, verbose):
+            self.agents = agents
+            self.tasks = tasks
+
+    class FakeProcess:
+        sequential = "sequential"
+
+    def fake_tool(_name):
+        return lambda function: function
+
+    monkeypatch.setattr(
+        "src.agents.crew._load_crewai",
+        lambda: (FakeAgent, FakeCrew, FakeProcess, FakeTask, fake_tool),
+    )
+    monkeypatch.setattr("src.agents.crew._llm", lambda: object())
+
+    crew = build_route_crew(
+        "competency_development_rag",
+        tools={"DifyRagTool": lambda question: question},
+    )
+
+    assert [agent.role for agent in crew.agents] == [
+        "Core Router",
+        "Competency & Development Specialist",
+        "Safety Reviewer",
+    ]
+    assert crew.tasks[1].context == [crew.tasks[0]]
+    assert crew.tasks[2].context == [crew.tasks[1]]
+
+
+def test_rag_payload_prefers_direct_dify_result_over_review_paraphrase():
+    tasks = [
+        {"intent": "competency_development_rag"},
+        {"answer": "Resposta completa do especialista.", "sources": [{"document": "politica_treinamentos.md"}]},
+        {"answer": "Resumo incorreto do revisor.", "sources": [{"document": "politica_treinamentos.md"}]},
+    ]
+    direct = {"answer": "Resposta completa retornada pelo Dify.", "sources": [{"document": "politica_treinamentos.md"}]}
+
+    assert _select_rag_payload(tasks, direct) == direct
+
+
+def test_rag_payload_ignores_reviewer_when_direct_result_is_unavailable():
+    tasks = [
+        {"intent": "competency_development_rag"},
+        {"answer": "Resposta completa do especialista.", "sources": [{"document": "politica_treinamentos.md"}]},
+        {"answer": "Resumo incorreto do revisor.", "sources": [{"document": "politica_treinamentos.md"}]},
+    ]
+
+    assert _select_rag_payload(tasks, None)["answer"] == "Resposta completa do especialista."
+
+
+class _RagExactQueryCrew:
+    def __init__(self, tools):
+        self.tools = tools
+
+    def kickoff(self, *, inputs):
+        payload = self.tools["DifyRagTool"]("paráfrase criada pelo agente")
+        return type(
+            "Result",
+            (),
+            {
+                "tasks_output": [
+                    {"intent": "competency_development_rag"},
+                    {"raw": payload},
+                    {"raw": '{"answer":"Resumo incorreto do revisor.","sources":[{"document":"politica_treinamentos.md"}]}'},
+                ],
+                "__str__": lambda self: "Resposta não estruturada",
+            },
+        )()
+
+
+def test_rag_runtime_uses_exact_original_question_and_direct_payload(monkeypatch):
+    monkeypatch.setenv("CREWAI_ENABLED", "true")
+    monkeypatch.setenv("DIFY_API_KEY", "synthetic")
+    calls = []
+
+    def fake_retrieve(client, question):
+        calls.append(question)
+        return {
+            "answer": "Resposta completa do Dify.",
+            "sources": [{"document": "politica_treinamentos.md"}],
+            "supported": True,
+            "source_type": "dify",
+        }
+
+    monkeypatch.setattr("src.agents.runtime.retrieve_rag_tool", fake_retrieve)
+    monkeypatch.setattr(
+        "src.agents.runtime.build_route_crew",
+        lambda route, tools: _RagExactQueryCrew(tools),
+    )
+
+    result = run_agent_turn("pergunta original")
+
+    assert result["status"] == "completed"
+    assert result["answer"] == "Resposta completa do Dify."
+    assert calls == ["pergunta original"]
+    assert result["synthesis"]["provider"] == "dify"
 
 
 def test_training_policy_and_gap_messages_use_agent_routes():
@@ -116,7 +228,7 @@ class _RagResult:
     ]
 
     def __str__(self):
-        return 'RAG answer: Treinamentos online valem horas.'
+        return "RAG answer: Treinamentos online valem horas."
 
 
 class _RagFakeCrew(_PolicyFakeCrew):

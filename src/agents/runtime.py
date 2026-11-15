@@ -51,6 +51,35 @@ def _preserve_rag_answer(canonical: str, synthesized: str, payload: dict[str, An
     return candidate
 
 
+def _task_payload(output: Any) -> dict[str, Any]:
+    """Decode one CrewAI task output without treating prose as structured data."""
+    candidate = getattr(output, "raw", output)
+    if isinstance(candidate, str):
+        try:
+            candidate = json.loads(candidate)
+        except json.JSONDecodeError:
+            return {}
+    return candidate if isinstance(candidate, dict) else {}
+
+
+def _select_rag_payload(
+    tasks_output: list[Any],
+    rag_cache: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Select the Dify payload, never a later review-only paraphrase."""
+    if isinstance(rag_cache, dict) and (rag_cache.get("answer") or rag_cache.get("sources")):
+        return dict(rag_cache)
+
+    # A RAG crew has [Core, Specialist, Safety Reviewer].  If a test double
+    # omits the core task, accept its first structured payload as a fallback.
+    candidates = tasks_output[1:-1] if len(tasks_output) >= 3 else tasks_output
+    for output in candidates:
+        candidate = _task_payload(output)
+        if candidate.get("answer") or candidate.get("sources"):
+            return candidate
+    return {}
+
+
 def _ml_deterministic_draft(profile: dict[str, Any], prediction: dict[str, Any]) -> str:
     """Build a dynamic, model-grounded ML draft before Gemini wording."""
     recommendations = prediction.get("recommendations") or []
@@ -268,7 +297,7 @@ def run_agent_turn(
             )
 
         def rag_tool(question: str) -> str:
-            """Retrieve competency and development evidence through Dify."""
+            """Retrieve Dify evidence using the user's exact original question."""
             nonlocal rag_cache
             if dify is None:
                 raise RuntimeError("Dify não foi habilitado para esta rota.")
@@ -277,7 +306,7 @@ def run_agent_turn(
                     "tool.rag",
                     "dify",
                     "DifyRagTool",
-                    lambda: retrieve_rag_tool(dify, question),
+                    lambda: retrieve_rag_tool(dify, message),
                 )
             return json.dumps(rag_cache, ensure_ascii=False, default=str)
 
@@ -355,27 +384,19 @@ def run_agent_turn(
         tasks_output = getattr(result, "tasks_output", None) or []
         core_output = tasks_output[0] if tasks_output else None
         reasoning_steps = sanitize_steps(agent_execution_steps(route.value, core_decision=core_output))
-        local_answer = str(result)
+        local_answer = "" if route == AgentRoute.RAG else str(result)
         table_rows: list[dict[str, Any]] = []
         sources: list[dict[str, Any]] = []
-        rag_payload: dict[str, Any] = {}
-        for output in tasks_output:
-            candidate = getattr(output, "raw", output)
-            if isinstance(candidate, str):
-                try:
-                    candidate = json.loads(candidate)
-                except json.JSONDecodeError:
-                    candidate = {}
-            if isinstance(candidate, dict):
-                if candidate.get("answer") or candidate.get("sources"):
-                    rag_payload = candidate
-                if candidate.get("rows") and not rag_payload.get("rows"):
-                    rag_payload["rows"] = candidate.get("rows")
+        rag_payload: dict[str, Any] = (
+            _select_rag_payload(tasks_output, rag_cache)
+            if route == AgentRoute.RAG
+            else {}
+        )
         if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
             rag_payload["supported"] = True
         if rag_payload.get("answer"):
             local_answer = str(rag_payload["answer"])
-        elif tasks_output:
+        elif tasks_output and route != AgentRoute.RAG:
             candidate = getattr(tasks_output[-1], "raw", tasks_output[-1])
             if isinstance(candidate, dict) and candidate.get("answer"):
                 local_answer = str(candidate["answer"])
@@ -413,7 +434,8 @@ def run_agent_turn(
             )
 
         synthesis["fallback"] = False
-        synthesis["provider"] = "gemini"
+        if route != AgentRoute.RAG:
+            synthesis["provider"] = "gemini"
         state_patch: dict[str, Any] = {"last_route": route.value}
         if ml_profile:
             state_patch["ml_profile"] = sanitize(ml_profile)
@@ -446,300 +468,6 @@ def run_agent_turn(
         if "JEV" in public_error or "systemone" in public_error:
             answer = "A extração estruturada do currículo não foi concluída. Verifique a configuração ou a disponibilidade do JEV."
         elif "Invalid response from LLM" in public_error or "None or empty" in public_error:
-            answer = "O modelo local não retornou uma resposta válida para esta etapa. Verifique o servidor e o modelo configurado."
-        else:
-            answer = "O fluxo especialista não pôde ser concluído. Verifique a configuração local."
-        return {
-            "status": "error",
-            "route": route.value,
-            "answer": answer,
-            "error": public_error,
-            "state_patch": {"last_route": route.value},
-        }
-        artifact_path = Path(
-            os.getenv(
-                "SKILLGRAPH_ML_ARTIFACT",
-                ".ml_artifacts/skillgraph_competency_tracks.pkl",
-            )
-        )
-        database = None
-        jev = JevClient(trace=trace) if route == AgentRoute.RESUME else None
-        dify = None
-        if route in {
-            AgentRoute.TRAINING,
-            AgentRoute.STRUCTURED,
-            AgentRoute.COMPETENCY_LOOKUP,
-        }:
-            database = SkillGraphDatabase(
-                Path(os.getenv("SKILLGRAPH_DATA_DIR", "data_bd"))
-            )
-        if route in {AgentRoute.RAG, AgentRoute.COMPARISON}:
-            dify = DifyClient.from_environment(trace=trace)
-
-        prediction_cache: str | None = None
-        rag_cache: dict[str, Any] | None = None
-
-        def prediction_tool(profile_json: str) -> str:
-            """Run the persisted competency PKL exactly once for a validated profile."""
-            nonlocal prediction_cache
-            if prediction_cache is not None:
-                return prediction_cache
-            profile = json.loads(profile_json)
-            raw_skills = profile.get("skills", {})
-            if isinstance(raw_skills, Mapping):
-                skills = {
-                    str(name): float(level)
-                    for name, level in raw_skills.items()
-                }
-            else:
-                skills = {
-                    item.get("normalized_name") or item["name"]: float(item.get("level") or 0)
-                    for item in raw_skills
-                }
-            prediction_cache = json.dumps(
-                _trace_tool(
-                    "tool.competency_recommendation",
-                    "ml",
-                    "CompetencyRecommendationTool",
-                    lambda: competency_recommendation_tool(artifact_path, skills),
-                ),
-                ensure_ascii=False,
-            )
-            return prediction_cache
-
-        prediction_result: dict[str, Any] | None = None
-        if route == AgentRoute.ML:
-            if not ml_profile:
-                raise RuntimeError("A rota de Machine Learning exige um perfil estruturado.")
-            prediction_result = json.loads(
-                prediction_tool(json.dumps(ml_profile, ensure_ascii=False))
-            )
-
-        def training_tool(competency: str = "") -> str:
-            """Query the allowlisted training catalog only."""
-            if database is None:
-                raise RuntimeError("DuckDB não foi habilitado para esta rota.")
-            return json.dumps(
-                _trace_tool(
-                    "tool.training_catalog",
-                    "duckdb",
-                    "TrainingCatalogTool",
-                    lambda: training_catalog_tool(database, competency or None),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
-
-        def competency_gap_tool() -> str:
-            """Query aggregate competency gaps from read-only DuckDB."""
-            if database is None:
-                raise RuntimeError("DuckDB não foi habilitado para esta rota.")
-            return json.dumps(
-                _trace_tool(
-                    "tool.competency_gap",
-                    "duckdb",
-                    "CompetencyGapTool",
-                    lambda: database.competency_gap_breakdown(limit=10),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
-
-        def rag_tool(question: str) -> str:
-            """Retrieve competency and development evidence through Dify."""
-            nonlocal rag_cache
-            if dify is None:
-                raise RuntimeError("Dify não foi habilitado para esta rota.")
-            if rag_cache is None:
-                rag_cache = _trace_tool(
-                    "tool.rag",
-                    "dify",
-                    "DifyRagTool",
-                    lambda: retrieve_rag_tool(dify, question),
-                )
-            return json.dumps(rag_cache, ensure_ascii=False, default=str)
-
-        def lookup_tool() -> str:
-            """Run the allowlisted lookup for synthetic employee and competency IDs."""
-            if database is None:
-                raise RuntimeError("DuckDB não foi habilitado para esta rota.")
-            employee = next(iter(re.findall(r"\bF\d{4}\b", message, re.IGNORECASE)), "")
-            competency = next(iter(re.findall(r"\bCOMP\d{3}\b", message, re.IGNORECASE)), "")
-            return json.dumps(
-                _trace_tool(
-                    "tool.competency_lookup",
-                    "duckdb",
-                    "CompetencyLookupTool",
-                    lambda: competency_lookup_tool(database, employee.upper(), competency.upper()),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
-
-        def comparison_tool_wrapper(question: str) -> str:
-            """Run source-backed document comparison through the Dify tool."""
-            if dify is None:
-                raise RuntimeError("Dify não foi habilitado para esta rota.")
-            return json.dumps(
-                _trace_tool(
-                    "tool.comparison",
-                    "dify",
-                    "ComparisonTool",
-                    lambda: comparison_tool(dify, question),
-                ),
-                ensure_ascii=False,
-                default=str,
-            )
-
-        tools = {
-            "CompetencyRecommendationTool": prediction_tool,
-            "TrainingCatalogTool": training_tool,
-            "CompetencyGapTool": competency_gap_tool,
-            "CompetencyLookupTool": lookup_tool,
-            "ComparisonTool": comparison_tool_wrapper,
-            "DifyRagTool": rag_tool,
-        }
-        if route == AgentRoute.GAP:
-            prediction_result = state.get("prediction")
-        jev_result = {}
-        resume_profile = None
-        redacted_resume_text = ""
-        if route == AgentRoute.RESUME:
-            if jev is None:
-                raise RuntimeError("JEV não foi habilitado para esta rota.")
-            redacted_resume_text, redactions = redact_text(resume_text or "")
-            redacted_resume_text = redacted_resume_text[:16000]
-            questions = JevClient.load_questions(
-                str(Path(__file__).parents[2] / "config" / "jev_resume_questions.json")
-            )
-            jev_response = jev_resume_tool(
-                jev,
-                {"document_text": redacted_resume_text, "purpose": "resume_extraction"},
-                questions,
-            )
-            jev_result = sanitize({"response": jev_response, "redactions": redactions})
-            resume_profile = extract_profile(redacted_resume_text, jev_result)
-        crew = build_route_crew(route.value, tools=tools)
-        result = crew.kickoff(
-            inputs={
-                "ml_profile": json.dumps(ml_profile or {}, ensure_ascii=False),
-
-                "message": message,
-                "resume_text": (
-                    "[processed by structured extractor]" if resume_text else ""
-                ),
-                "resume_profile": (
-                    resume_profile.model_dump_json() if resume_profile else ""
-                ),
-                "jev_result": json.dumps(jev_result, ensure_ascii=False),
-                "profile_rendered": (
-                    render_profile(resume_profile) if resume_profile else ""
-                ),
-                "review_result": "",
-                "conversation_state": json.dumps(state, ensure_ascii=False),
-            }
-        )
-        tasks_output = getattr(result, "tasks_output", None) or []
-        core_output = tasks_output[0] if tasks_output else None
-        reasoning_steps = agent_execution_steps(
-            route.value,
-            core_decision=core_output,
-        )
-        reasoning_steps = sanitize_steps(reasoning_steps)
-        local_answer = str(result)
-        table_rows: list[dict[str, Any]] = []
-        sources: list[dict[str, Any]] = []
-        rag_payload: dict[str, Any] = {}
-        for output in tasks_output:
-            candidate = getattr(output, "raw", output)
-            if isinstance(candidate, str):
-                try:
-                    candidate = json.loads(candidate)
-                except json.JSONDecodeError:
-                    candidate = {}
-            if isinstance(candidate, dict):
-                if candidate.get("answer") or candidate.get("sources"):
-                    rag_payload = candidate
-                if candidate.get("rows") and not rag_payload.get("rows"):
-                    rag_payload["rows"] = candidate.get("rows")
-        if route == AgentRoute.RAG and rag_payload.get("answer") and rag_payload.get("sources"):
-            rag_payload["supported"] = True
-        if rag_payload.get("answer"):
-            local_answer = str(rag_payload["answer"])
-        elif tasks_output:
-            candidate = getattr(tasks_output[-1], "raw", tasks_output[-1])
-            if isinstance(candidate, dict) and candidate.get("answer"):
-                local_answer = str(candidate["answer"])
-        if route == AgentRoute.ML and prediction_result:
-            local_answer = _ml_deterministic_draft(ml_profile or {}, prediction_result)
-        if not local_answer.strip():
-            local_answer = "O fluxo especialista foi concluído sem uma resposta textual."
-        if isinstance(rag_payload.get("rows"), list):
-            table_rows = rag_payload["rows"]
-        if isinstance(rag_payload.get("sources"), list):
-            sources = rag_payload["sources"]
-        else:
-            sources = []
-        structured_context = {
-            "profile_rendered": render_profile(resume_profile)
-            if resume_profile
-            else "",
-            "profile": resume_profile.model_dump(mode="json") if resume_profile else None,
-            "rag_answer": rag_payload.get("answer", ""),
-            "rag_sources": rag_payload.get("sources", []),
-            "prediction": prediction_result,
-            "ml_profile": ml_profile,
-            "state": sanitize(state),
-        }
-        final_answer, synthesis = synthesize_response(
-            route.value,
-            local_answer,
-            structured_context=structured_context,
-            sources=rag_payload.get("sources", []),
-            trace=trace,
-        )
-        if route == AgentRoute.ML and prediction_result:
-            final_answer = str(final_answer)
-
-        synthesis["fallback"] = False
-        synthesis["provider"] = "gemini"
-        state_patch: dict[str, Any] = {"last_route": route.value}
-        if ml_profile:
-            state_patch["ml_profile"] = sanitize(ml_profile)
-        if prediction_result:
-            state_patch["prediction"] = sanitize(prediction_result)
-        if resume_profile:
-            state_patch["employee_profile"] = sanitize(resume_profile.model_dump(mode="json"))
-        return {
-            "status": "completed",
-            "route": route.value,
-            "answer": final_answer,
-            "profile": (
-                resume_profile.model_dump(mode="json") if resume_profile else ml_profile
-            ),
-            "structured": prediction_result,
-            "table_rows": table_rows,
-            "sources": sources,
-            "reasoning": sanitize_steps(reasoning_steps),
-            "synthesis": {key: value for key, value in synthesis.items() if key != "error"},
-            "state_patch": state_patch,
-        }
-    except CrewAIUnavailable as exc:
-        return {
-            "status": "error",
-            "route": route.value,
-            "answer": f"O sistema multiagente não está disponível: {exc}",
-            "error": str(exc),
-            "state_patch": {"last_route": route.value},
-        }
-    except Exception as exc:
-        public_error = str(exc)
-        if "JEV" in public_error or "systemone" in public_error:
-            answer = "A extração estruturada do currículo não foi concluída. Verifique a configuração ou a disponibilidade do JEV."
-        elif (
-            "Invalid response from LLM" in public_error
-            or "None or empty" in public_error
-        ):
             answer = "O modelo local não retornou uma resposta válida para esta etapa. Verifique o servidor e o modelo configurado."
         else:
             answer = "O fluxo especialista não pôde ser concluído. Verifique a configuração local."
