@@ -139,15 +139,19 @@ def training_catalog_tool(
 def rag_tool(client: DifyClient, question: str) -> dict[str, Any]:
     """Retrieve the answer and evidence from Dify, with controlled corpus recovery."""
     result = client.chat(question)
+    # A textual Dify answer remains canonical even when SSE metadata does not
+    # expose retriever sources. Missing source metadata must not replace a
+    # valid provider answer with the weaker local paragraph matcher.
+    has_answer = bool(result.answer and result.answer.strip())
     payload = {
         "answer": result.answer,
         "sources": result.sources,
         "conversation_id": result.conversation_id,
         "message_id": result.message_id,
-        "supported": bool(result.answer and result.sources),
+        "supported": has_answer,
         "source_type": "dify",
     }
-    if not payload["supported"]:
+    if not has_answer:
         fallback = _local_rag_fallback(question)
         if fallback:
             payload.update(fallback)
