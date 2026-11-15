@@ -29,3 +29,13 @@ def test_conversation_history_is_isolated_by_role(tmp_path):
     assert len(store.list_conversations(role="desenvolvedor")) == 1
     assert len(store.list_conversations(role="RH")) == 1
     assert store.messages(developer, role="RH") == []
+
+
+def test_conversations_can_be_isolated_by_backend(tmp_path):
+    store = SessionStore(tmp_path / "state.sqlite")
+    chat = store.create_conversation("Chat", backend="crewai", role="desenvolvedor")
+    ml = store.create_conversation("ML", backend="ml", role="desenvolvedor")
+    assert store.list_conversations(role="desenvolvedor", backend="crewai")[0]["id"] == chat
+    assert store.list_conversations(role="desenvolvedor", backend="ml")[0]["id"] == ml
+    assert store.get_conversation(chat, role="desenvolvedor", backend="ml") is None
+    assert store.get_conversation(ml, role="desenvolvedor", backend="ml")["title"] == "ML"

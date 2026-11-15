@@ -1,46 +1,94 @@
-from src.agents.schemas import EmployeeProfile
-from src.resume_profile import render_profile
+import json
+
+from src.resume_profile import extract_profile
 
 
-def test_render_profile_formats_recognized_unknown_and_missing_skills():
-    text = render_profile(
-        EmployeeProfile.model_validate(
-            {
-                "skills": [
-                    {
-                        "name": "Python",
-                        "level": 4,
-                        "confidence": 0.88,
-                        "evidence": "APIs Python",
+class Response:
+    status_code = 200
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return {
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "employee_context": "colaborador da equipe de dados",
+                                        "skills": [
+                                            {
+                                                "name": "Python",
+                                                "level": 4,
+                                                "confidence": 0.9,
+                                                "evidence": "Python avançado",
+                                            }
+                                        ],
+                                        "unrecognized_skills": [],
+                                        "missing_information": [],
+                                    },
+                                    ensure_ascii=False,
+                                )
+                            }
+                        ]
                     }
-                ],
-                "unrecognized_skills": [
-                    {
-                        "name": "Kubernetes",
-                        "level": None,
-                        "confidence": 0.2,
-                        "evidence": "menção breve",
-                    }
-                ],
-                "missing_information": ["Profundidade em cloud"],
-            }
-        )
+                }
+            ]
+        }
+
+
+class Session:
+    def __init__(self):
+        self.calls = []
+
+    def post(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return Response()
+
+
+def test_resume_profile_uses_gemini_provider_when_configured(monkeypatch):
+    session = Session()
+    monkeypatch.setenv("RESUME_PROFILE_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "synthetic-key")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    monkeypatch.setattr("src.resume_profile.requests.post", session.post)
+
+    profile = extract_profile("Python avançado", {"response": {}})
+
+    assert profile.skills[0].name == "Python"
+    assert session.calls[0][0].endswith(
+        "/models/gemini-3.1-flash-lite:generateContent"
     )
-    assert "Python" in text
-    assert "4/5" in text
-    assert "Kubernetes" in text
-    assert "não determinável" in text
-    assert "Profundidade em cloud" in text
+    assert session.calls[0][1]["params"] == {"key": "synthetic-key"}
 
 
-def test_render_profile_does_not_turn_missing_level_into_zero():
-    text = render_profile(
-        EmployeeProfile.model_validate(
+def test_resume_profile_keeps_openai_compatible_local_provider(monkeypatch):
+    session = Session()
+    monkeypatch.setenv("RESUME_PROFILE_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("RESUME_PROFILE_BASE_URL", "http://lm-studio.test/v1")
+    monkeypatch.setenv("RESUME_PROFILE_MODEL", "local-model")
+    response = Response()
+    response.json = lambda: {
+        "choices": [
             {
-                "skills": [{"name": "Cloud", "level": None, "confidence": 0.2}],
-                "unrecognized_skills": [],
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "employee_context": "colaborador",
+                            "skills": [],
+                            "unrecognized_skills": [],
+                            "missing_information": [],
+                        }
+                    )
+                }
             }
-        )
-    )
-    assert "não determinável" in text
-    assert "nível 0/5" not in text
+        ]
+    }
+    session.post = lambda url, **kwargs: response
+    monkeypatch.setattr("src.resume_profile.requests.post", session.post)
+    profile = extract_profile("Python", {})
+
+    assert profile.employee_context == "colaborador"
