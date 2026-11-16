@@ -29,13 +29,13 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
         self.model_name = model or os.getenv(
             "EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite"
         )
-        self.base_url = (
+        self.base_url = self._native_base_url(
             base_url
             or os.getenv(
                 "EVAL_JUDGE_BASE_URL",
                 "https://generativelanguage.googleapis.com/v1beta",
             )
-        ).rstrip("/")
+        )
         self.api_key = (
             api_key
             or os.getenv("EVAL_JUDGE_API_KEY")
@@ -49,8 +49,29 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
             raise RuntimeError("EVAL_JUDGE_API_KEY ou GEMINI_API_KEY não configurada.")
         super().__init__(model_name=self.model_name)
 
+    @staticmethod
+    def _native_base_url(value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        # The native Gemini REST API must use /v1beta. A value copied from
+        # OpenAI-compatible integrations may contain /openai; remove it so
+        # requests never become /v1beta/openai/models/...
+        if normalized.endswith("/openai"):
+            normalized = normalized[: -len("/openai")].rstrip("/")
+        if normalized.endswith("/v1"):
+            normalized = normalized[: -len("/v1")] + "/v1beta"
+        if not normalized.endswith("/v1beta"):
+            normalized = normalized + "/v1beta"
+        return normalized
+
     def load_model(self, *args, **kwargs) -> "LocalDeepEvalModel":
         return self
+
+    def diagnostics(self) -> dict[str, Any]:
+        return {
+            "model": self.model_name,
+            "base_url": self.base_url,
+            "configured": bool(self.api_key),
+        }
 
     def generate(self, prompt: str, schema: Any | None = None) -> Any:
         body: dict[str, Any] = {
