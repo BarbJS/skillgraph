@@ -78,13 +78,13 @@ def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
         retrieval_context=case.get("contexts", []),
     )
     metric_types = (
-        FaithfulnessMetric,
-        AnswerRelevancyMetric,
-        ContextualPrecisionMetric,
-        ContextualRecallMetric,
+        ("Faithfulness", FaithfulnessMetric),
+        ("Answer Relevancy", AnswerRelevancyMetric),
+        ("Contextual Precision", ContextualPrecisionMetric),
+        ("Contextual Recall", ContextualRecallMetric),
     )
     metric_results = []
-    for metric_type in metric_types:
+    for metric_name, metric_type in metric_types:
         metric = metric_type(model=model, async_mode=False, include_reason=True)
         try:
             metric.measure(test_case, _show_indicator=False)
@@ -94,7 +94,7 @@ def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
             metric.reason = f"{type(exc).__name__}: {exc}"[:600]
         metric_results.append(
             SimpleNamespace(
-                name=metric.__class__.__name__.removesuffix("Metric"),
+                name=metric_name,
                 score=getattr(metric, "score", None),
                 threshold=getattr(metric, "threshold", 0.5),
                 success=bool(getattr(metric, "success", False)),
@@ -108,7 +108,7 @@ def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
         "case_id": case.get("id"),
         "results": "sequential",
         "evaluation": evaluation,
-        "metrics": [metric_type.__name__ for metric_type in metric_types],
+        "metrics": [metric_type.__name__ for _, metric_type in metric_types],
     }
 
 

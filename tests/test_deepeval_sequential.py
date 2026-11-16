@@ -54,5 +54,11 @@ def test_live_deepeval_runs_each_metric_sequentially(monkeypatch):
         "FakePrecision",
         "FakeRecall",
     ]
+    assert [item.name for item in result["evaluation"].metrics_data] == [
+        "Faithfulness",
+        "Answer Relevancy",
+        "Contextual Precision",
+        "Contextual Recall",
+    ]
     assert len(result["evaluation"].metrics_data) == 4
     assert all(item.score == 0.9 for item in result["evaluation"].metrics_data)
