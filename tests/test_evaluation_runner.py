@@ -1,6 +1,52 @@
 import json
 
-from src.evaluation_runner import run_deterministic_evaluation, run_live_evaluation
+from src.evaluation_runner import _execute_rag_case, run_deterministic_evaluation, run_live_evaluation
+
+
+def test_rag_evaluation_does_not_call_final_gemini_synthesis(monkeypatch):
+    class Result:
+        answer = "resposta Dify"
+        sources = [{"content": "contexto"}]
+
+    class Client:
+        def chat(self, question):
+            return Result()
+
+    monkeypatch.setattr(
+        "src.evaluation_runner.synthesize_response",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("não sintetizar")),
+        raising=False,
+    )
+    result = _execute_rag_case(
+        {"id": "rag-1", "question": "pergunta", "answer": "", "contexts": []},
+        Client(),
+    )
+    assert result["answer"] == "resposta Dify"
+    assert result["contexts"] == ["contexto"]
+
+
+def test_live_runner_records_case_failure_and_continues(monkeypatch, tmp_path):
+    dataset = tmp_path / "rag.jsonl"
+    dataset.write_text(
+        json.dumps({"id": "rag-1", "category": "rag", "question": "q", "answer": "a", "contexts": [], "ground_truth": "a"}) + "\n"
+    )
+    output = tmp_path / "live.json"
+    monkeypatch.setattr("src.evaluation_runner.DifyClient.from_environment", lambda: object())
+    monkeypatch.setattr("src.evaluation_runner._execute_rag_case", lambda case, client: (_ for _ in ()).throw(RuntimeError("quota")))
+
+    class FakeModel:
+        model_name = "judge"
+        provider = "test"
+        base_url = "test://judge"
+        embeddings = type("Embeddings", (), {"model_name": "embed", "provider": "test", "base_url": "test://embed"})()
+
+    report = run_live_evaluation(dataset_path=dataset, output_path=output, model=FakeModel())
+    assert report["evaluated_cases"] == 1
+    assert report["case_results"][0]["passed"] is False
+    assert "quota" in report["case_results"][0]["error"]
+    assert output.exists()
+
+
 
 
 def test_live_runner_uses_rag_dataset_only(tmp_path):

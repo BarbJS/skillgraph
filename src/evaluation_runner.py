@@ -13,7 +13,6 @@ from src.deepeval_embeddings import GeminiEvaluationEmbeddings
 from src.deepeval_report import parse_evaluate_output, summarize_results
 from src.dify_client import DifyClient
 from src.evaluation_ai import load_golden_cases, run_live_deepeval
-from src.response_synthesis import synthesize_response
 from src.security import UserRole, evaluate_input
 
 ProgressCallback = Callable[[str, int, int], None]
@@ -28,12 +27,29 @@ def _source_contexts(sources: list[dict[str, Any]]) -> list[str]:
 
 
 def _execute_rag_case(case: dict[str, Any], client: DifyClient) -> dict[str, Any]:
+    """Execute RAG without production-only final synthesis.
+
+    DeepEval must judge the current Dify answer against the retrieved context.
+    Sending every case through Gemini first adds an unrelated quota dependency and
+    can make the evaluation fail before the judge runs.
+    """
     result = client.chat(str(case["question"]))
     contexts = _source_contexts(result.sources)
     answer = result.answer
-    if answer:
-        answer, _ = synthesize_response(AgentRoute.RAG.value, answer, sources=result.sources)
+    if not answer.strip():
+        answer = ""
     return {**case, "answer": answer, "contexts": contexts}
+
+
+def _failure_result(case: dict[str, Any], error: Exception) -> dict[str, Any]:
+    return {
+        "case_id": case.get("id"),
+        "category": case.get("category", ""),
+        "metrics": {},
+        "passed": False,
+        "parse_error": "Execução RAG não concluída.",
+        "error": str(error)[:300],
+    }
 
 
 def _execute_case(case: dict[str, Any], database: Any = None) -> dict[str, Any]:
@@ -90,27 +106,27 @@ def run_live_evaluation(*, dataset_path: Path, output_path: Path, model: Any | N
     cases = load_golden_cases(dataset_path)
     client = DifyClient.from_environment()
     selected = [case for case in cases if not case_id or case.get("id") == case_id]
-    evaluated = [_execute_rag_case(case, client) for case in selected]
     judge = model or LocalDeepEvalModel()
     embeddings = getattr(judge, "embeddings", None) or GeminiEvaluationEmbeddings()
     parsed_results = []
     raw_results = []
-    for index, case in enumerate(evaluated, start=1):
+    for index, case in enumerate(selected, start=1):
         if progress:
-            progress(str(case.get("id", "")), index, len(evaluated))
-        live = run_live_deepeval(case, model=judge)
-        raw_results.append({"case_id": case.get("id"), "results": live.get("results", "")})
-        parsed_results.append(
-            parse_evaluate_output(case, live["evaluation"])
-            if live.get("evaluation") is not None
-            else {
-                "case_id": case.get("id"),
-                "category": case.get("category", ""),
-                "metrics": {},
-                "passed": False,
-                "parse_error": "DeepEval não retornou objeto de avaliação.",
-            }
-        )
+            progress(str(case.get("id", "")), index, len(selected))
+        try:
+            evaluated = _execute_rag_case(case, client)
+            live = run_live_deepeval(evaluated, model=judge)
+            raw_results.append({"case_id": case.get("id"), "results": live.get("results", "")})
+            parsed_results.append(
+                parse_evaluate_output(evaluated, live["evaluation"])
+                if live.get("evaluation") is not None
+                else _failure_result(
+                    case, RuntimeError("DeepEval não retornou objeto de avaliação.")
+                )
+            )
+        except Exception as exc:
+            raw_results.append({"case_id": case.get("id"), "results": "", "error": str(exc)[:300]})
+            parsed_results.append(_failure_result(case, exc))
     report = {
         "mode": "live",
         "run_at": datetime.now(timezone.utc).isoformat(),

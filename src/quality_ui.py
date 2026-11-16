@@ -170,13 +170,21 @@ def render_quality() -> None:
             progress_bar.progress(index / max(total, 1))
             status.info(f"Avaliando RAG {index}/{total}: {case_id}")
 
-        live = run_live_evaluation(
-            dataset_path=ROOT / "evals/rag_goldens.jsonl",
-            output_path=live_path,
-            progress=update_progress,
-        )
-        progress_bar.progress(1.0)
-        status.success("Golden Dataset e casos RAG concluídos.")
+        try:
+            live = run_live_evaluation(
+                dataset_path=ROOT / "evals/rag_goldens.jsonl",
+                output_path=live_path,
+                progress=update_progress,
+            )
+            progress_bar.progress(1.0)
+            status.success("Golden Dataset e casos RAG concluídos.")
+        except Exception:
+            progress_bar.progress(1.0)
+            status.error("A execução live foi concluída com falhas registradas por caso.")
+            st.warning(
+                "Alguns casos não puderam ser avaliados. O relatório parcial foi preservado; "
+                "verifique a tabela de resultados e a configuração do provider."
+            )
         st.rerun()
 
     col1, col2, col3 = st.columns(3)
