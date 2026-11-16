@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+_NATIVE_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+
 try:
     from deepeval.models import DeepEvalBaseLLM
 except ImportError:
@@ -26,14 +28,18 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
         api_key: str | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self.model_name = model or os.getenv(
-            "EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite"
+        self.model_name = self._native_model_name(
+            model or os.getenv("EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite")
         )
-        self.base_url = self._native_base_url(
+        self.base_url = _NATIVE_GEMINI_BASE_URL
+        # Keep the configured endpoint for diagnostics only. Native judge calls
+        # always use the canonical Google Gemini REST endpoint, so a stale
+        # Streamlit secret cannot redirect evaluation to /openai.
+        self.configured_base_url = self._native_base_url(
             base_url
             or os.getenv(
                 "EVAL_JUDGE_BASE_URL",
-                "https://generativelanguage.googleapis.com/v1beta",
+                _NATIVE_GEMINI_BASE_URL,
             )
         )
         self.api_key = (
@@ -48,6 +54,17 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
         if not self.api_key:
             raise RuntimeError("EVAL_JUDGE_API_KEY ou GEMINI_API_KEY não configurada.")
         super().__init__(model_name=self.model_name)
+
+    @staticmethod
+    def _native_model_name(value: str) -> str:
+        normalized = value.strip()
+        if normalized.startswith("models/"):
+            normalized = normalized[len("models/"):]
+        if normalized.startswith("gemini/"):
+            normalized = normalized[len("gemini/"):]
+        if ":generateContent" in normalized:
+            normalized = normalized.split(":generateContent", 1)[0]
+        return normalized.strip("/")
 
     @staticmethod
     def _native_base_url(value: str) -> str:

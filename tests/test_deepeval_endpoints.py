@@ -2,6 +2,13 @@ from src.deepeval_embeddings import GeminiEvaluationEmbeddings
 from src.deepeval_judge import LocalDeepEvalModel
 
 
+def test_judge_normalizes_openai_model_name(monkeypatch):
+    monkeypatch.setenv("EVAL_JUDGE_API_KEY", "key")
+    judge = LocalDeepEvalModel(model="gemini/gemini-3.1-flash-lite")
+    assert judge.model_name == "gemini-3.1-flash-lite"
+    assert judge.request_url().endswith("/models/gemini-3.1-flash-lite:generateContent")
+
+
 def test_judge_normalizes_openai_suffix_to_native_gemini_endpoint(monkeypatch):
     monkeypatch.setenv(
         "EVAL_JUDGE_BASE_URL",
