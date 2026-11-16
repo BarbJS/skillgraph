@@ -53,7 +53,16 @@ def evaluate_offline(
 
 
 def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
-    from deepeval import evaluate
+    """Evaluate one case sequentially to avoid provider quota bursts.
+
+    DeepEval's default async/concurrent execution can issue the four judge
+    requests at once. That is especially likely to trigger a Gemini RPM/TPM
+    limit in Streamlit Cloud even when the daily quota is still available.
+    Running one metric at a time also preserves partial scores and the exact
+    provider error for the metric that failed.
+    """
+    from types import SimpleNamespace
+
     from deepeval.metrics import (
         AnswerRelevancyMetric,
         ContextualPrecisionMetric,
@@ -68,13 +77,71 @@ def run_live_deepeval(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
         expected_output=case.get("ground_truth", ""),
         retrieval_context=case.get("contexts", []),
     )
+    metric_types = (
+        FaithfulnessMetric,
+        AnswerRelevancyMetric,
+        ContextualPrecisionMetric,
+        ContextualRecallMetric,
+    )
+    metric_results = []
+    for metric_type in metric_types:
+        metric = metric_type(model=model, async_mode=False, include_reason=True)
+        try:
+            metric.measure(test_case, _show_indicator=False)
+        except Exception as exc:
+            metric.score = None
+            metric.success = False
+            metric.reason = f"{type(exc).__name__}: {exc}"[:600]
+        metric_results.append(
+            SimpleNamespace(
+                name=metric.__class__.__name__.removesuffix("Metric"),
+                score=getattr(metric, "score", None),
+                threshold=getattr(metric, "threshold", 0.5),
+                success=bool(getattr(metric, "success", False)),
+                reason=str(getattr(metric, "reason", "") or "")[:600],
+                evaluation_model=getattr(metric, "evaluation_model", None),
+                evaluation_cost=getattr(metric, "evaluation_cost", None),
+            )
+        )
+    evaluation = SimpleNamespace(metrics_data=metric_results)
+    return {
+        "case_id": case.get("id"),
+        "results": "sequential",
+        "evaluation": evaluation,
+        "metrics": [metric_type.__name__ for metric_type in metric_types],
+    }
+
+
+def run_live_deepeval_legacy(case: dict[str, Any], *, model: Any) -> dict[str, Any]:
+    """Compatibility helper for callers that need DeepEval's aggregate runner."""
+    from deepeval import evaluate
+    from deepeval.metrics import (
+        AnswerRelevancyMetric,
+        ContextualPrecisionMetric,
+        ContextualRecallMetric,
+        FaithfulnessMetric,
+    )
+    from deepeval.test_case import LLMTestCase
+    from deepeval.evaluate.configs import AsyncConfig, DisplayConfig
+
+    test_case = LLMTestCase(
+        input=case["question"],
+        actual_output=case.get("answer", ""),
+        expected_output=case.get("ground_truth", ""),
+        retrieval_context=case.get("contexts", []),
+    )
     metrics = [
-        FaithfulnessMetric(model=model),
-        AnswerRelevancyMetric(model=model),
-        ContextualPrecisionMetric(model=model),
-        ContextualRecallMetric(model=model),
+        FaithfulnessMetric(model=model, async_mode=False),
+        AnswerRelevancyMetric(model=model, async_mode=False),
+        ContextualPrecisionMetric(model=model, async_mode=False),
+        ContextualRecallMetric(model=model, async_mode=False),
     ]
-    results = evaluate([test_case], metrics)
+    results = evaluate(
+        [test_case],
+        metrics,
+        async_config=AsyncConfig(run_async=False),
+        display_config=DisplayConfig(show_indicator=False),
+    )
     return {
         "case_id": case.get("id"),
         "results": str(results),
