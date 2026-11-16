@@ -16,7 +16,7 @@ except ImportError:
 
 
 class LocalDeepEvalModel(DeepEvalBaseLLM):
-    """Compatibility name for the evaluation-only Gemini judge adapter."""
+    """Gemini adapter that supports DeepEval structured schemas."""
 
     def __init__(
         self,
@@ -26,9 +26,21 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
         api_key: str | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self.model_name = model or os.getenv("EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite")
-        self.base_url = (base_url or os.getenv("EVAL_JUDGE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta")).rstrip("/")
-        self.api_key = api_key or os.getenv("EVAL_JUDGE_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+        self.model_name = model or os.getenv(
+            "EVAL_JUDGE_MODEL", "gemini-3.1-flash-lite"
+        )
+        self.base_url = (
+            base_url
+            or os.getenv(
+                "EVAL_JUDGE_BASE_URL",
+                "https://generativelanguage.googleapis.com/v1beta",
+            )
+        ).rstrip("/")
+        self.api_key = (
+            api_key
+            or os.getenv("EVAL_JUDGE_API_KEY")
+            or os.getenv("GEMINI_API_KEY", "")
+        )
         self.session = session or requests.Session()
         self.provider = "google_gemini"
         self.usage_metadata: dict[str, Any] = {}
