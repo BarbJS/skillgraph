@@ -52,16 +52,21 @@ class LocalDeepEvalModel(DeepEvalBaseLLM):
     @staticmethod
     def _native_base_url(value: str) -> str:
         normalized = value.strip().rstrip("/")
-        # The native Gemini REST API must use /v1beta. A value copied from
-        # OpenAI-compatible integrations may contain /openai; remove it so
-        # requests never become /v1beta/openai/models/...
-        if normalized.endswith("/openai"):
-            normalized = normalized[: -len("/openai")].rstrip("/")
+        # The native Gemini REST API must use /v1beta. Any /openai suffix or
+        # segment belongs to an OpenAI-compatible integration and is invalid
+        # for the native generateContent endpoint.
+        marker = "/openai"
+        if marker in normalized:
+            normalized = normalized.split(marker, 1)[0].rstrip("/")
         if normalized.endswith("/v1"):
             normalized = normalized[: -len("/v1")] + "/v1beta"
         if not normalized.endswith("/v1beta"):
             normalized = normalized + "/v1beta"
         return normalized
+
+    def request_url(self) -> str:
+        """Return the exact native Gemini URL prefix used by the judge."""
+        return f"{self.base_url}/models/{self.model_name}:generateContent"
 
     def load_model(self, *args, **kwargs) -> "LocalDeepEvalModel":
         return self
