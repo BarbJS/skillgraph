@@ -88,18 +88,8 @@ class SessionStore:
             )
         return conversation_id
 
-    def list_conversations(
-        self, role: str | None = None, backend: str | None = None
-    ) -> list[dict[str, Any]]:
-        clauses: list[str] = []
-        params: list[Any] = []
-        if role:
-            clauses.append("role = ?")
-            params.append(role)
-        if backend:
-            clauses.append("backend = ?")
-            params.append(backend)
-        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    def list_conversations(self, role: str | None = None) -> list[dict[str, Any]]:
+        where, params = ("WHERE role = ?", (role,)) if role else ("", ())
         with self._connect() as db:
             rows = db.execute(
                 f"SELECT id,title,dify_conversation_id,backend,created_at,updated_at,role FROM conversations {where} ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC, id DESC",
@@ -108,18 +98,12 @@ class SessionStore:
         return [dict(row) for row in rows]
 
     def get_conversation(
-        self,
-        conversation_id: str,
-        role: str | None = None,
-        backend: str | None = None,
+        self, conversation_id: str, role: str | None = None
     ) -> dict[str, Any] | None:
         query, params = "SELECT * FROM conversations WHERE id = ?", [conversation_id]
         if role:
             query += " AND role = ?"
             params.append(role)
-        if backend:
-            query += " AND backend = ?"
-            params.append(backend)
         with self._connect() as db:
             row = db.execute(query, params).fetchone()
         return dict(row) if row else None
@@ -154,10 +138,7 @@ class SessionStore:
             db.execute(query, params)
 
     def search_conversations(
-        self,
-        text: str,
-        role: str | None = None,
-        backend: str | None = None,
+        self, text: str, role: str | None = None
     ) -> list[dict[str, Any]]:
         query = f"%{text.strip()}%"
         clauses = ["(c.title LIKE ? OR m.content LIKE ?)"]
@@ -165,10 +146,6 @@ class SessionStore:
         if role:
             clauses.append("c.role = ?")
             params.append(role)
-        if backend:
-            clauses.append("c.backend = ?")
-            params.append(backend)
-
         with self._connect() as db:
             rows = db.execute(
                 "SELECT DISTINCT c.* FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id WHERE "
@@ -179,12 +156,9 @@ class SessionStore:
         return [dict(row) for row in rows]
 
     def agent_state(
-        self,
-        conversation_id: str,
-        role: str | None = None,
-        backend: str | None = None,
+        self, conversation_id: str, role: str | None = None
     ) -> dict[str, Any]:
-        conversation = self.get_conversation(conversation_id, role, backend)
+        conversation = self.get_conversation(conversation_id, role)
         if not conversation:
             return {}
         try:
@@ -255,12 +229,9 @@ class SessionStore:
         return item
 
     def messages(
-        self,
-        conversation_id: str,
-        role: str | None = None,
-        backend: str | None = None,
+        self, conversation_id: str, role: str | None = None
     ) -> list[dict[str, Any]]:
-        if not self.get_conversation(conversation_id, role, backend):
+        if not self.get_conversation(conversation_id, role):
             return []
         with self._connect() as db:
             rows = db.execute(
@@ -268,51 +239,6 @@ class SessionStore:
                 (conversation_id,),
             ).fetchall()
         return [self._message_row(row) for row in rows]
-
-    def migrate_legacy_ml_conversations(self, role: str | None = None) -> int:
-        """Move legacy ML messages out of the general chat backend."""
-        clauses = ["backend = 'crewai'"]
-        params: list[Any] = []
-        if role:
-            clauses.append("role = ?")
-            params.append(role)
-        moved = 0
-        with self._connect() as db:
-            conversations = db.execute(
-                "SELECT * FROM conversations WHERE " + " AND ".join(clauses),
-                params,
-            ).fetchall()
-            for conversation in conversations:
-                rows = db.execute(
-                    "SELECT id, route FROM messages WHERE conversation_id=?",
-                    (conversation["id"],),
-                ).fetchall()
-                ml_rows = [row for row in rows if row["route"] == "ml_prediction"]
-                if not ml_rows:
-                    continue
-                if len(ml_rows) == len(rows):
-                    db.execute(
-                        "UPDATE conversations SET backend='ml', updated_at=? WHERE id=?",
-                        (self._now(), conversation["id"]),
-                    )
-                    moved += 1
-                    continue
-                new_id, now = str(uuid.uuid4()), self._now()
-                title = conversation["title"] or "Recomendação de trilhas de competências"
-                db.execute(
-                    "INSERT INTO conversations (id,title,dify_conversation_id,backend,created_at,updated_at,role,agent_state_json) VALUES (?, ?, '', 'ml', ?, ?, ?, '{}')",
-                    (new_id, title[:80], now, now, conversation["role"]),
-                )
-                db.execute(
-                    "UPDATE messages SET conversation_id=? WHERE conversation_id=? AND route='ml_prediction'",
-                    (new_id, conversation["id"]),
-                )
-                db.execute(
-                    "UPDATE conversations SET updated_at=? WHERE id=?",
-                    (self._now(), conversation["id"]),
-                )
-                moved += 1
-        return moved
 
     def delete_conversation(
         self, conversation_id: str, role: str | None = None

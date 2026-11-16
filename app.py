@@ -209,18 +209,9 @@ def _migrate_conversation_title(conversation: dict[str, Any]) -> None:
             store.rename_conversation(conversation["id"], new_title, role=role)
 
 
-def _new_conversation(
-    role: str,
-    *,
-    title: str = "Nova conversa",
-    backend: str = "crewai",
-    state_key: str = "active_conversation_id",
-) -> str:
-    """Create and activate an empty conversation for one UI area."""
+def _new_conversation(role: str, *, title: str = "Nova conversa", backend: str = "crewai") -> str:
+    """Create and immediately activate an empty conversation for the selected role."""
     conversation_id = store.create_conversation(title, backend, role=role)
-    st.session_state[state_key] = conversation_id
-    if state_key != "active_conversation_id":
-        return conversation_id
     st.session_state.active_conversation_id = conversation_id
     st.session_state.conversation_id = ""
     st.session_state.pop("pending_prompt", None)
@@ -243,27 +234,11 @@ def _ensure_resume_conversation(question: str, role: str) -> str:
     return conversation_id
 
 
-def _active_conversation(role: str, backend: str = "crewai") -> dict[str, Any] | None:
+def _active_conversation(role: str) -> dict[str, Any] | None:
     conversation_id = st.session_state.get("active_conversation_id")
     if not conversation_id:
         return None
-    return store.get_conversation(conversation_id, role=role, backend=backend)
-
-
-def _conversation_backend(area: str) -> str:
-    return "ml" if area == "Machine Learning" else "crewai"
-
-
-def _ensure_area_conversation(role: str, backend: str) -> None:
-    """Select only conversations belonging to the currently visible area."""
-    store.migrate_legacy_ml_conversations(role=role)
-    current_id = st.session_state.get("active_conversation_id")
-    if current_id and store.get_conversation(current_id, role=role, backend=backend):
-        return
-    conversations = store.list_conversations(role=role, backend=backend)
-    st.session_state.active_conversation_id = conversations[0]["id"] if conversations else None
-    active = conversations[0] if conversations else None
-    st.session_state.conversation_id = active.get("dify_conversation_id", "") if active else ""
+    return store.get_conversation(conversation_id, role=role)
 
 
 # Conversation-specific state is intentionally loaded from SessionStore after reruns.
@@ -517,9 +492,7 @@ def _render_ml_page() -> None:
     )
     assistant = LocalMLAssistant(artifact_path, artifact=artifact)
     active_id = st.session_state.get("active_conversation_id")
-    persisted_messages = (
-        store.messages(active_id, role=role, backend="ml") if active_id else []
-    )
+    persisted_messages = store.messages(active_id, role=role) if active_id else []
     for message in persisted_messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -532,14 +505,8 @@ def _render_ml_page() -> None:
     )
     if ml_question:
         ml_conversation_id = st.session_state.get("active_conversation_id")
-        if not ml_conversation_id or not store.get_conversation(
-            ml_conversation_id, role=role, backend="ml"
-        ):
-            ml_conversation_id = _new_conversation(
-                role,
-                title="Recomendação de trilhas de competências",
-                backend="ml",
-            )
+        if not ml_conversation_id or not store.get_conversation(ml_conversation_id, role=role):
+            ml_conversation_id = _new_conversation(role, title="Recomendação de trilhas de competências", backend="crewai")
         store.add_message(
             ml_conversation_id,
             "user",
@@ -549,6 +516,9 @@ def _render_ml_page() -> None:
             conversation_role=role,
         )
         with st.chat_message("user"):
+            st.markdown(ml_question)
+        with st.chat_message("assistant"):
+
             st.markdown(ml_question)
         with st.chat_message("assistant"):
             ml_trace = TraceContext(
@@ -761,10 +731,7 @@ def _select_suggested_prompt(prompt: str) -> None:
 
 
 def _render_sidebar(
-    database: SkillGraphDatabase | None,
-    db_error: str | None,
-    role: str,
-    backend: str,
+    database: SkillGraphDatabase | None, db_error: str | None, role: str
 ) -> None:
     with st.sidebar:
         st.subheader("Sobre o protótipo")
@@ -779,7 +746,7 @@ def _render_sidebar(
             use_container_width=True,
             key="new-conversation-primary",
         ):
-            _new_conversation(role, backend=backend)
+            _new_conversation(role)
             st.rerun()
         conversation_search = st.text_input(
             "Buscar conversas",
@@ -788,11 +755,9 @@ def _render_sidebar(
             label_visibility="collapsed",
         )
         conversations = (
-            store.search_conversations(
-                conversation_search, role=role, backend=backend
-            )
+            store.search_conversations(conversation_search, role=role)
             if conversation_search.strip()
-            else store.list_conversations(role=role, backend=backend)
+            else store.list_conversations(role=role)
         )
         if conversation_search.strip():
             st.caption(f"{len(conversations)} conversa(s) encontrada(s)")
@@ -890,21 +855,25 @@ with st.sidebar:
             horizontal=True,
             key="general-area",
         )
-    backend = _conversation_backend(gestor_view)
-    _render_sidebar(database, db_error, role, backend)
+    _render_sidebar(database, db_error, role)
 
 if "active_conversation_id" not in st.session_state:
     st.session_state.active_conversation_id = None
 if "conversation_id" not in st.session_state:
     st.session_state.conversation_id = ""
 
-backend = _conversation_backend(gestor_view)
-_ensure_area_conversation(role, backend)
-active = _active_conversation(role, backend)
-if active:
-    st.session_state.conversation_id = active.get("dify_conversation_id", "")
+role_conversations = store.list_conversations(role=role)
+active = _active_conversation(role)
+if active is None:
+    if role_conversations:
+        st.session_state.active_conversation_id = role_conversations[0]["id"]
+        active = role_conversations[0]
+    else:
+        st.session_state.active_conversation_id = None
+        active = None
+    st.session_state.conversation_id = active.get("dify_conversation_id", "") if active else ""
 else:
-    st.session_state.conversation_id = ""
+    st.session_state.conversation_id = active.get("dify_conversation_id", "")
 
 if gestor_view == "Machine Learning":
     _render_ml_page()
