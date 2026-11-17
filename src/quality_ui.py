@@ -100,6 +100,12 @@ def _live_metric_rows(summary: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _score_display(metric: dict[str, Any]) -> Any:
+    if not metric or metric.get("score") is None:
+        return "Erro/sem score"
+    return metric.get("score")
+
+
 def _live_case_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
     rows = []
     for case in report.get("case_results", []):
@@ -108,11 +114,41 @@ def _live_case_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
             "Categoria": case.get("category", ""),
             "Aprovado": "Sim" if case.get("passed") else "Não",
             "Média do caso": case.get("score_mean"),
+            "Cobertura das métricas": case.get("score_coverage", "—"),
+            "Contextos recuperados": case.get("retrieved_context_count", "—"),
+            "Diagnóstico": case.get("retrieval_diagnostic", "—"),
         }
         for metric in ("faithfulness", "answer_relevancy", "contextual_precision", "contextual_recall"):
-            item[_metric_label(metric)] = case.get("metrics", {}).get(metric, {}).get("score")
+            item[_metric_label(metric)] = _score_display(case.get("metrics", {}).get(metric, {}))
         rows.append(item)
     return rows
+
+
+def _render_case_evidence(case: dict[str, Any]) -> None:
+    st.markdown("**Pergunta**")
+    st.write(case.get("question", "—"))
+    st.markdown("**Resposta efetivamente avaliada**")
+    st.write(case.get("answer", "(vazia)"))
+    st.markdown("**Fonte da verdade usada pelo judge**")
+    st.write(case.get("ground_truth", "—"))
+    with st.expander("Contextos recuperados pelo Dify", expanded=False):
+        sources = case.get("retrieved_sources", [])
+        if sources:
+            st.json(sources)
+        else:
+            contexts = case.get("contexts", [])
+            st.write(contexts if contexts else "Nenhum contexto retornado.")
+    with st.expander("Resposta e contextos de referência do caso", expanded=False):
+        st.json(
+            {
+                "reference_answer": case.get("reference_answer", ""),
+                "reference_contexts": case.get("reference_contexts", []),
+            }
+        )
+    if case.get("retrieval_diagnostic") == "answer_or_context_missing":
+        st.warning("A resposta ou os contextos recuperados estão vazios; scores baixos podem refletir falha de recuperação.")
+    if case.get("error"):
+        st.error(case["error"])
 
 
 def _render_live_case_detail(report: dict[str, Any]) -> None:
@@ -124,11 +160,14 @@ def _render_live_case_detail(report: dict[str, Any]) -> None:
     case = by_id[selected]
     st.markdown(f"**Caso:** `{selected}` · **Categoria:** {case.get('category', '—')}")
     st.metric("Média do caso", case.get("score_mean", "—"))
+    _render_case_evidence(case)
     for name, metric in case.get("metrics", {}).items():
         with st.expander(_metric_label(name), expanded=False):
             st.write(
                 {
                     "score": metric.get("score"),
+                    "state": case.get("metric_states", {}).get(name, "ok"),
+                    "score_zero_is_valid_result": metric.get("score") == 0.0,
                     "threshold": metric.get("threshold"),
                     "success": metric.get("success"),
                     "evaluation_model": metric.get("evaluation_model"),

@@ -23,12 +23,18 @@ def test_rag_evaluation_does_not_call_final_gemini_synthesis(monkeypatch):
     )
     assert result["answer"] == "resposta Dify"
     assert result["contexts"] == ["contexto"]
+    assert result["reference_answer"] == ""
+    assert result["reference_contexts"] == []
+    assert result["retrieved_context_count"] == 1
+    assert result["answer_present"] is True
+    assert result["contexts_present"] is True
+    assert result["retrieved_sources"] == [{"content": "contexto"}]
 
 
 def test_live_runner_records_case_failure_and_continues(monkeypatch, tmp_path):
     dataset = tmp_path / "rag.jsonl"
     dataset.write_text(
-        json.dumps({"id": "rag-1", "category": "rag", "question": "q", "answer": "a", "contexts": [], "ground_truth": "a"}) + "\n"
+        json.dumps({"id": "rag-1", "category": "rag", "question": "q", "answer": "a", "contexts": ["c"], "ground_truth": "a"}) + "\n"
     )
     output = tmp_path / "live.json"
     monkeypatch.setattr("src.evaluation_runner.DifyClient.from_environment", lambda: object())

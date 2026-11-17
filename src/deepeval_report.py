@@ -37,12 +37,17 @@ def parse_test_result(case_id: str, category: str, result: Any) -> dict[str, Any
             "cost": getattr(item, "evaluation_cost", None),
         }
     scores = [item["score"] for item in metrics.values() if item["score"] is not None]
+    missing_scores = sum(item["score"] is None for item in metrics.values())
     return {
         "case_id": case_id,
         "category": category,
         "metrics": metrics,
         "passed": bool(metrics) and all(item["success"] for item in metrics.values()),
+        "complete": set(metrics) == {_metric_name(name) for name in METRICS},
         "score_mean": round(mean(scores), 4) if scores else None,
+        "score_count": len(scores),
+        "score_coverage": round(len(scores) / len(METRICS), 4),
+        "missing_score_count": missing_scores,
     }
 
 

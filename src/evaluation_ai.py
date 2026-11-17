@@ -29,6 +29,20 @@ def load_golden_cases(path: Path) -> list[dict[str, Any]]:
     ]
 
 
+def validate_rag_case(case: dict[str, Any]) -> list[str]:
+    """Return missing or malformed fields required by live RAG evaluation."""
+    errors: list[str] = []
+    for field in ("id", "category", "question", "answer", "ground_truth"):
+        if not str(case.get(field, "")).strip():
+            errors.append(field)
+    contexts = case.get("contexts")
+    if not isinstance(contexts, list) or not contexts or not all(
+        isinstance(item, str) and item.strip() for item in contexts
+    ):
+        errors.append("contexts")
+    return sorted(set(errors))
+
+
 def validate_golden_case(case: dict[str, Any]) -> list[str]:
     return sorted(
         {"id", "category", "question", "expected_route", "must_block"} - set(case)

@@ -66,3 +66,25 @@ def test_live_case_rows_include_four_scores():
     )
     assert rows[0]["Faithfulness"] == 0.9
     assert rows[0]["Contextual Recall"] == 0.9
+    assert rows[0]["Contextos recuperados"] == "—"
+
+
+def test_live_case_rows_distinguish_zero_from_missing_score():
+    rows = _live_case_rows(
+        {
+            "case_results": [
+                {
+                    "case_id": "rag-zero",
+                    "metrics": {
+                        "contextual_precision": {"score": 0.0},
+                        "contextual_recall": {"score": None},
+                    },
+                    "retrieved_context_count": 0,
+                    "retrieval_diagnostic": "answer_or_context_missing",
+                }
+            ]
+        }
+    )
+    assert rows[0]["Contextual Precision"] == 0.0
+    assert rows[0]["Contextual Recall"] == "Erro/sem score"
+    assert rows[0]["Diagnóstico"] == "answer_or_context_missing"

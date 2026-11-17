@@ -18,6 +18,25 @@ def test_parse_and_summarize_deepeval_metrics():
     assert summary["metrics"]["answer_relevancy"]["pass_rate"] == 1.0
 
 
+def test_zero_scores_are_preserved_and_none_is_excluded_from_aggregates():
+    result = SimpleNamespace(
+        metrics_data=[
+            SimpleNamespace(name="Contextual Precision", score=0.0, threshold=0.5, success=False, reason="no context", evaluation_model="judge"),
+            SimpleNamespace(name="Contextual Recall", score=None, threshold=0.5, success=False, reason="error", evaluation_model="judge"),
+        ]
+    )
+    parsed = parse_test_result("case-zero", "rag", result)
+    summary = summarize_results([parsed])
+    assert parsed["metrics"]["contextual_precision"]["score"] == 0.0
+    assert parsed["metrics"]["contextual_recall"]["score"] is None
+    assert parsed["passed"] is False
+    assert parsed["score_coverage"] == 0.25
+    assert parsed["missing_score_count"] == 1
+    assert summary["metrics"]["contextual_precision"]["count"] == 1
+    assert summary["metrics"]["contextual_precision"]["minimum"] == 0.0
+    assert "contextual_recall" not in summary["metrics"]
+
+
 def test_summary_reports_weaknesses_and_recommendation():
     result = SimpleNamespace(
         metrics_data=[

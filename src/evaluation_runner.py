@@ -11,7 +11,7 @@ from src.agents.router import AgentRoute, route_turn
 from src.deepeval_judge import LocalDeepEvalModel
 from src.deepeval_report import parse_evaluate_output, summarize_results
 from src.dify_client import DifyClient
-from src.evaluation_ai import load_golden_cases, run_live_deepeval
+from src.evaluation_ai import load_golden_cases, run_live_deepeval, validate_rag_case
 from src.security import UserRole, evaluate_input
 
 ProgressCallback = Callable[[str, int, int], None]
@@ -34,17 +34,74 @@ def _execute_rag_case(case: dict[str, Any], client: DifyClient) -> dict[str, Any
     """
     result = client.chat(str(case["question"]))
     contexts = _source_contexts(result.sources)
-    answer = result.answer
-    if not answer.strip():
-        answer = ""
-    return {**case, "answer": answer, "contexts": contexts}
+    answer = result.answer.strip()
+    return {
+        **case,
+        "reference_answer": str(case.get("answer", "")),
+        "reference_contexts": list(case.get("contexts", [])),
+        "answer": answer,
+        "contexts": contexts,
+        "retrieved_sources": list(result.sources),
+        "retrieved_context_count": len(contexts),
+        "answer_present": bool(answer),
+        "contexts_present": bool(contexts),
+        "usage": getattr(result, "usage", {}),
+    }
 
 
-def _failure_result(case: dict[str, Any], error: Exception) -> dict[str, Any]:
+def _metric_state(metric: dict[str, Any]) -> str:
+    score = metric.get("score")
+    if score is None:
+        return "error"
+    if float(score) == 0.0:
+        return "score_zero"
+    return "ok"
+
+
+def _enrich_case_result(result: dict[str, Any], evaluated: dict[str, Any]) -> dict[str, Any]:
+    enriched = {
+        **result,
+        "question": evaluated.get("question", ""),
+        "answer": evaluated.get("answer", ""),
+        "ground_truth": evaluated.get("ground_truth", ""),
+        "reference_answer": evaluated.get("reference_answer", ""),
+        "contexts": evaluated.get("contexts", []),
+        "retrieved_sources": evaluated.get("retrieved_sources", []),
+        "reference_contexts": evaluated.get("reference_contexts", []),
+        "retrieved_context_count": evaluated.get("retrieved_context_count", 0),
+        "answer_present": evaluated.get("answer_present", False),
+        "contexts_present": evaluated.get("contexts_present", False),
+        "retrieval_diagnostic": (
+            "answer_or_context_missing"
+            if not evaluated.get("answer_present") or not evaluated.get("contexts_present")
+            else "retrieved"
+        ),
+    }
+    enriched["metric_states"] = {
+        name: _metric_state(metric)
+        for name, metric in enriched.get("metrics", {}).items()
+    }
+    return enriched
+
+
+def _failure_result(case: dict[str, Any], error: Exception, evaluated: dict[str, Any] | None = None) -> dict[str, Any]:
+    evaluated = evaluated or case
     return {
         "case_id": case.get("id"),
         "category": case.get("category", ""),
+        "question": evaluated.get("question", case.get("question", "")),
+        "answer": evaluated.get("answer", ""),
+        "ground_truth": evaluated.get("ground_truth", case.get("ground_truth", "")),
+        "reference_answer": evaluated.get("reference_answer", case.get("answer", "")),
+        "contexts": evaluated.get("contexts", []),
+        "retrieved_sources": evaluated.get("retrieved_sources", []),
+        "reference_contexts": evaluated.get("reference_contexts", case.get("contexts", [])),
+        "retrieved_context_count": len(evaluated.get("contexts", [])),
+        "answer_present": bool(evaluated.get("answer", "")),
+        "contexts_present": bool(evaluated.get("contexts", [])),
+        "retrieval_diagnostic": "evaluation_error",
         "metrics": {},
+        "metric_states": {},
         "passed": False,
         "parse_error": "Execução RAG não concluída.",
         "error": str(error)[:300],
@@ -105,6 +162,11 @@ def run_live_evaluation(*, dataset_path: Path, output_path: Path, model: Any | N
     cases = load_golden_cases(dataset_path)
     client = DifyClient.from_environment()
     selected = [case for case in cases if not case_id or case.get("id") == case_id]
+    invalid_cases = {
+        str(case.get("id")): validate_rag_case(case)
+        for case in selected
+        if validate_rag_case(case)
+    }
     judge = model or LocalDeepEvalModel()
     parsed_results = []
     raw_results = []
@@ -112,14 +174,25 @@ def run_live_evaluation(*, dataset_path: Path, output_path: Path, model: Any | N
         if progress:
             progress(str(case.get("id", "")), index, len(selected))
         try:
+            case_errors = invalid_cases.get(str(case.get("id")), [])
+            if case_errors:
+                raise ValueError(
+                    "Caso RAG inválido; campos ausentes ou malformados: "
+                    + ", ".join(case_errors)
+                )
             evaluated = _execute_rag_case(case, client)
             live = run_live_deepeval(evaluated, model=judge)
             raw_results.append({"case_id": case.get("id"), "results": live.get("results", "")})
             parsed_results.append(
-                parse_evaluate_output(evaluated, live["evaluation"])
+                _enrich_case_result(
+                    parse_evaluate_output(evaluated, live["evaluation"]),
+                    evaluated,
+                )
                 if live.get("evaluation") is not None
                 else _failure_result(
-                    case, RuntimeError("DeepEval não retornou objeto de avaliação.")
+                    case,
+                    RuntimeError("DeepEval não retornou objeto de avaliação."),
+                    evaluated,
                 )
             )
         except Exception as exc:
