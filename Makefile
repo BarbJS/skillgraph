@@ -89,7 +89,7 @@ evaluate-ai:
 	./scripts/evaluate-ai.py
 
 evaluate-ai-live:
-	./scripts/evaluate-ai-live.py
+	./scripts/evaluate-ai-live.py --deepeval --yes-live --dataset evals/rag_goldens.jsonl
 
 # Live RAGAS/DeepEval evaluations are explicit and may consume LLM credits.
 
