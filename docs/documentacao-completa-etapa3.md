@@ -157,24 +157,6 @@ O Dify local e o Dify Cloud são instâncias diferentes. O Chatflow e os vetores
 
 A configuração de referência permanece em `config/dify-chatflow-reference.json`: parent-child, indexação de alta qualidade, busca vetorial/híbrida, Top K 4 e sem reranker/score threshold inicialmente. A separação entre modelo conversacional e modelo de embeddings é explícita: Gemini 3.1 Flash Lite gera respostas; `gemini-embedding-001` vetoriza documentos e perguntas.
 
-#### Ajuste de chunking e recuperação validado no Dify Cloud
-
-Durante a validação pública, a pergunta “Treinamentos online contam para a carga horária anual?” inicialmente recuperava trechos relacionados à tabela de carga horária por nível, mas não separava adequadamente a resposta do FAQ sobre cursos online. O modelo acabava misturando a regra geral de modalidades válidas com a regra específica de treinamentos com nota inferior a 7,0.
-
-A Knowledge Base foi recriada e reindexada com:
-
-- **Parent max characters:** 800, reduzido de 1024;
-- **Child max characters:** 375, reduzido de 512;
-- separação por seções/parágrafos para manter perguntas e respostas do FAQ no mesmo contexto, sem misturar a seção de aprovação com a seção de modalidades;
-- recuperação híbrida, combinando semântica e palavras-chave;
-- Top K 4;
-- limite de pontuação desativado inicialmente;
-- reranking mantido desativado até validar quota e relevância.
-
-A redução da granularidade foi necessária porque chunks maiores agrupavam duas evidências semanticamente próximas, mas logicamente diferentes: “cursos online valem horas” e “treinamentos com nota inferior a 7,0 não contam para a carga horária mínima”. Com chunks menores, o Dify recupera a seção correta do `faq_desenvolvimento.md` e reduz a transferência indevida de condições entre seções.
-
-Após a recriação da Knowledge Base, o teste passou a recuperar a evidência correta e responder de acordo com a pergunta. A resposta deve continuar distinguindo “vale horas” de “conta automaticamente para a carga horária mínima”; quando essa relação não estiver explícita na fonte, o sistema deve declarar a ausência e recomendar confirmação com o RH.
-
 #### Decisão sobre a API do Dify
 
 O cliente do projeto usa `DIFY_API_BASE_URL` e `DIFY_API_KEY`. Ele aceita a base local e a base cloud com ou sem `/v1`, normalizando o endpoint para `/v1/chat-messages` sem duplicar o caminho. O parser trata eventos Chatflow `message`, `agent_message`, `message_end`, `workflow_finished` e falhas do workflow, porque o Chatflow Cloud pode encerrar o stream sem emitir apenas chunks `message`.
@@ -503,7 +485,6 @@ Essa limitação do JEV impede afirmar que a classificação de competências, n
 
 Também é necessário distinguir segurança cibernética convencional — aplicação, infraestrutura, APIs, upload, autenticação, autorização, TLS e dependências — de segurança específica de IA, que inclui prompt injection direta e indireta, jailbreak, exfiltração de PII e secrets, abuso de ferramentas, manipulação de contexto, obfuscação e bypass de guardrails. Nenhuma dessas frentes pode ser considerada encerrada apenas com os testes automatizados atuais.
 
-
 ## 12. Próximos passos
 
 - expandir ataques sintéticos multilíngues e Unicode;
@@ -523,4 +504,4 @@ Também é necessário distinguir segurança cibernética convencional — aplic
 
 A indisponibilidade produtiva do JEV e a ausência de uma avaliação adversarial independente são bloqueadores de maturidade operacional: o sistema pode continuar sendo demonstrado como protótipo, mas não deve ser apresentado como uma solução produtiva plenamente validada.
 
-A Etapa 3, neste início, é portanto uma etapa de confiabilidade: corrige integrações, torna avaliações executáveis contra o código atual, mede o uso real de APIs, centraliza a validação de respostas e registra explicitamente as limitações da segurança implementada.
+A Etapa 3 é portanto uma etapa de confiabilidade: corrige integrações, torna avaliações executáveis contra o código atual, mede o uso real de APIs, centraliza a validação de respostas e registra explicitamente as limitações da segurança implementada, além de realizar o deploy da aplicação e disponibilizar para o uso real de usuários.

@@ -19,7 +19,9 @@ pytest -q tests
 python scripts/evaluate-ai.py --output /tmp/skillgraph-ai-quality-report.json
 ```
 
-A execução offline do Golden Dataset não precisa de chaves, Dify, Gemini ou JEV. Ela executa os 25 casos determinísticos contra o roteador/guardrails locais e grava um relatório no caminho informado.
+A execução offline do Golden Dataset não precisa de chaves, Dify, Gemini ou JEV. Ela executa os 25 casos determinísticos contra o roteador/guardrails locais e grava um relatório no caminho informado. O botão `Golden Dataset + casos RAG` da interface é diferente: ele executa uma rodada live dos 25 casos pelo runtime da aplicação e, em seguida, os 12 casos RAG live.
+
+A rodada live do Golden pode depender de CrewAI, Dify, DuckDB, ML ou outros providers conforme a rota do caso. Se uma dependência não estiver configurada, o caso fica registrado como erro de configuração e não é contado como aprovado.
 
 Para validar especificamente os datasets e as rotas:
 

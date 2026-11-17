@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from src.evaluation_ai import load_golden_cases
-from src.evaluation_runner import run_deterministic_evaluation, run_live_evaluation
+from src.evaluation_runner import run_live_evaluation, run_live_golden_evaluation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -191,12 +191,14 @@ def render_quality() -> None:
     st.subheader("Executar nova rodada")
     rag_cases = load_golden_cases(ROOT / "evals/rag_goldens.jsonl")
     st.caption(
-        f"A rodada executa primeiro os {len(cases)} casos determinísticos e depois os {len(rag_cases)} casos RAG com DeepEval. O segundo passo consome chamadas do modelo judge."
+        f"A rodada executa primeiro os {len(cases)} casos Golden live e depois os {len(rag_cases)} casos RAG live. As duas etapas podem consumir serviços externos e quota."
     )
     st.caption(
-        f"A primeira etapa é concluída antes do início da avaliação semântica: Golden Dataset ({len(cases)}) → casos RAG ({len(rag_cases)}) → quatro métricas por caso."
+        f"Sequência: Golden Dataset live ({len(cases)}) → casos RAG live ({len(rag_cases)}) → quatro métricas DeepEval por caso RAG."
     )
-
+    st.info(
+        "A validação offline rápida continua disponível por `make evaluate-ai`; este botão executa a rodada live do app."
+    )
     confirm = st.checkbox(
         "Confirmo o uso do modelo judge para avaliar os casos RAG",
         key="quality-confirm-live",
@@ -204,15 +206,20 @@ def render_quality() -> None:
     if st.button("Executar Golden Dataset + casos RAG", disabled=not confirm, key="quality-run-all"):
         progress_bar = st.progress(0.0)
         status = st.empty()
-        deterministic = run_deterministic_evaluation(
+        def update_golden_progress(case_id: str, index: int, total: int) -> None:
+            progress_bar.progress(index / max(total + len(rag_cases), 1))
+            status.info(f"Avaliando Golden live {index}/{total}: {case_id}")
+
+        deterministic = run_live_golden_evaluation(
             dataset_path=ROOT / "evals/golden_dataset.jsonl",
             output_path=report_path,
+            progress=update_golden_progress,
         )
-        status.info("Golden Dataset concluído. Iniciando casos RAG...")
+        status.info("Golden Dataset live concluído. Iniciando casos RAG live...")
 
         def update_progress(case_id: str, index: int, total: int) -> None:
-            progress_bar.progress(index / max(total, 1))
-            status.info(f"Avaliando RAG {index}/{total}: {case_id}")
+            progress_bar.progress((len(cases) + index) / max(len(cases) + total, 1))
+            status.info(f"Avaliando RAG live {index}/{total}: {case_id}")
 
         try:
             live = run_live_evaluation(

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from src.agents.router import AgentRoute, route_turn
+from src.agents.runtime import run_agent_turn
 from src.deepeval_judge import LocalDeepEvalModel
 from src.deepeval_report import parse_evaluate_output, summarize_results
 from src.dify_client import DifyClient
@@ -136,6 +137,83 @@ def _execute_case(case: dict[str, Any], database: Any = None) -> dict[str, Any]:
         "error": "",
         "passed": route_ok and block_ok,
     }
+
+
+def run_live_golden_evaluation(
+    *,
+    dataset_path: Path,
+    output_path: Path,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    """Run Golden Dataset cases through the current application runtime."""
+    cases = load_golden_cases(dataset_path)
+    results = []
+    for index, case in enumerate(cases, start=1):
+        case_id = str(case.get("id", ""))
+        if progress:
+            progress(case_id, index, len(cases))
+        question = str(case.get("question", ""))
+        expected_route = str(case.get("expected_route", ""))
+        expected_route = {"rag": AgentRoute.RAG.value, "sql_indicator": AgentRoute.STRUCTURED.value}.get(
+            expected_route, expected_route
+        )
+        started = datetime.now(timezone.utc)
+        try:
+            runtime = run_agent_turn(question)
+            actual_route = str(runtime.get("route", ""))
+            actual_blocked = runtime.get("status") == "blocked" or actual_route == AgentRoute.BLOCKED.value
+            expected_blocked = bool(case.get("must_block"))
+            results.append(
+                {
+                    "id": case_id,
+                    "category": case.get("category", ""),
+                    "question": question,
+                    "expected_route": expected_route,
+                    "actual_route": actual_route,
+                    "expected_must_block": expected_blocked,
+                    "actual_blocked": actual_blocked,
+                    "answer": str(runtime.get("answer", "")),
+                    "answer_preview": str(runtime.get("answer", ""))[:500],
+                    "expected_answer_facts": case.get("expected_answer_facts", []),
+                    "status": runtime.get("status", ""),
+                    "error": str(runtime.get("error", "")),
+                    "route_ok": actual_route == expected_route,
+                    "block_ok": actual_blocked is expected_blocked,
+                    "passed": actual_route == expected_route and actual_blocked is expected_blocked and runtime.get("status") != "error",
+                    "run_at": started.isoformat(),
+                }
+            )
+        except Exception as exc:
+            results.append(
+                {
+                    "id": case_id,
+                    "category": case.get("category", ""),
+                    "question": question,
+                    "expected_route": expected_route,
+                    "actual_route": "",
+                    "expected_must_block": bool(case.get("must_block")),
+                    "actual_blocked": False,
+                    "answer": "",
+                    "answer_preview": "",
+                    "expected_answer_facts": case.get("expected_answer_facts", []),
+                    "status": "error",
+                    "error": str(exc)[:500],
+                    "route_ok": False,
+                    "block_ok": False,
+                    "passed": False,
+                    "run_at": started.isoformat(),
+                }
+            )
+    report = {
+        "mode": "live_core_router",
+        "run_at": datetime.now(timezone.utc).isoformat(),
+        "total": len(results),
+        "passed": sum(bool(item["passed"]) for item in results),
+        "results": results,
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    return report
 
 
 def run_deterministic_evaluation(*, dataset_path: Path, output_path: Path, progress: ProgressCallback | None = None) -> dict[str, Any]:

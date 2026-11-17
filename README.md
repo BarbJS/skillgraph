@@ -203,6 +203,10 @@ python scripts/evaluate-ai-live.py \
   --output output/evaluation/live_ai_report.json
 ```
 
+Na interface, o botão **Executar Golden Dataset + casos RAG** executa uma rodada diferente: primeiro percorre os 25 casos do Golden Dataset pelo runtime live da aplicação e depois envia os 12 casos RAG ao Dify e ao DeepEval. A rodada pode consumir serviços externos; casos com provider/configuração ausente são registrados como erro, não como aprovação. A validação offline rápida continua disponível com `make evaluate-ai`.
+
+O progresso da interface é exibido como `Golden live 1/25` e, depois, `RAG live 1/12`.
+
 ## ☁️ Deploy atual
 
 O app publicado utiliza Streamlit Community Cloud. A configuração de produção deve conter os secrets necessários para:

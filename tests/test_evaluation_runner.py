@@ -1,6 +1,49 @@
 import json
 
-from src.evaluation_runner import _execute_rag_case, run_deterministic_evaluation, run_live_evaluation
+from src.evaluation_runner import (
+    _execute_rag_case,
+    run_deterministic_evaluation,
+    run_live_evaluation,
+    run_live_golden_evaluation,
+)
+
+
+def test_live_golden_runner_executes_all_cases_and_records_progress(monkeypatch, tmp_path):
+    dataset = tmp_path / "golden.jsonl"
+    dataset.write_text(
+        json.dumps({"id": "x", "category": "smalltalk", "question": "oi", "expected_route": "smalltalk", "must_block": False}) + "\n"
+    )
+    output = tmp_path / "live-golden.json"
+    monkeypatch.setattr(
+        "src.evaluation_runner.run_agent_turn",
+        lambda question: {"status": "local", "route": "smalltalk", "answer": "oi"},
+    )
+    progress = []
+    report = run_live_golden_evaluation(
+        dataset_path=dataset,
+        output_path=output,
+        progress=lambda case_id, index, total: progress.append((case_id, index, total)),
+    )
+    assert report["mode"] == "live_core_router"
+    assert report["total"] == 1
+    assert report["passed"] == 1
+    assert progress == [("x", 1, 1)]
+    assert output.exists()
+
+
+def test_live_golden_runner_does_not_approve_runtime_error(monkeypatch, tmp_path):
+    dataset = tmp_path / "golden.jsonl"
+    dataset.write_text(
+        json.dumps({"id": "x", "category": "rag", "question": "q", "expected_route": "competency_development_rag", "must_block": False}) + "\n"
+    )
+    monkeypatch.setattr(
+        "src.evaluation_runner.run_agent_turn",
+        lambda question: {"status": "error", "route": "competency_development_rag", "answer": "falhou", "error": "Dify ausente"},
+    )
+    report = run_live_golden_evaluation(dataset_path=dataset, output_path=tmp_path / "live.json")
+    assert report["passed"] == 0
+
+
 
 
 def test_rag_evaluation_does_not_call_final_gemini_synthesis(monkeypatch):
