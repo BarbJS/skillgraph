@@ -150,9 +150,14 @@ def render_quality() -> None:
     live = _load_json(live_path)
 
     st.subheader("Executar nova rodada")
+    rag_cases = load_golden_cases(ROOT / "evals/rag_goldens.jsonl")
     st.caption(
-        "A rodada executa primeiro os 20 casos determinísticos e depois os 12 casos RAG com DeepEval. O segundo passo consome chamadas do modelo judge."
+        f"A rodada executa primeiro os {len(cases)} casos determinísticos e depois os {len(rag_cases)} casos RAG com DeepEval. O segundo passo consome chamadas do modelo judge."
     )
+    st.caption(
+        f"A primeira etapa é concluída antes do início da avaliação semântica: Golden Dataset ({len(cases)}) → casos RAG ({len(rag_cases)}) → quatro métricas por caso."
+    )
+
     confirm = st.checkbox(
         "Confirmo o uso do modelo judge para avaliar os casos RAG",
         key="quality-confirm-live",

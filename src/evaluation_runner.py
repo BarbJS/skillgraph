@@ -9,7 +9,6 @@ from typing import Any, Callable
 
 from src.agents.router import AgentRoute, route_turn
 from src.deepeval_judge import LocalDeepEvalModel
-from src.deepeval_embeddings import GeminiEvaluationEmbeddings
 from src.deepeval_report import parse_evaluate_output, summarize_results
 from src.dify_client import DifyClient
 from src.evaluation_ai import load_golden_cases, run_live_deepeval
@@ -107,7 +106,6 @@ def run_live_evaluation(*, dataset_path: Path, output_path: Path, model: Any | N
     client = DifyClient.from_environment()
     selected = [case for case in cases if not case_id or case.get("id") == case_id]
     judge = model or LocalDeepEvalModel()
-    embeddings = getattr(judge, "embeddings", None) or GeminiEvaluationEmbeddings()
     parsed_results = []
     raw_results = []
     for index, case in enumerate(selected, start=1):
@@ -139,9 +137,6 @@ def run_live_evaluation(*, dataset_path: Path, output_path: Path, model: Any | N
         "judge_provider": getattr(judge, "provider", "google_gemini"),
         "judge_endpoint": getattr(judge, "base_url", ""),
         "judge_usage": getattr(judge, "last_usage", {}),
-        "embedding_model": embeddings.model_name,
-        "embedding_provider": embeddings.provider,
-        "embedding_endpoint": embeddings.base_url,
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str), encoding="utf-8")

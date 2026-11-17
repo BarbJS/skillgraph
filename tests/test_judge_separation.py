@@ -7,6 +7,6 @@ def test_production_chat_does_not_import_judge_adapter():
     assert "run_live_evaluation" not in source
 
 
-def test_evaluation_report_contract_names_judge_and_embedding_models():
+def test_evaluation_report_contract_names_judge_model():
     from src.evaluation_runner import run_live_evaluation
     assert callable(run_live_evaluation)

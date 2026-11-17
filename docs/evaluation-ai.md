@@ -5,7 +5,9 @@ RAGAS foi removido do projeto. A avaliação de qualidade usa Golden Dataset, te
 - RAGAS: não utilizado.
 - DeepEval: LLM-as-a-judge com Google Gemini, somente em avaliação live explicitamente autorizada.
 
-O judge usa `EVAL_JUDGE_MODEL=gemini-3.1-flash-lite` no endpoint Google Gemini e as métricas que dependem de embeddings usam `EVAL_EMBEDDING_MODEL=gemini-embedding-001`. Nenhum desses adapters é importado ou executado no caminho normal do chat.
+O judge usa `EVAL_JUDGE_MODEL=gemini-3.1-flash-lite` no endpoint nativo Google Gemini `/v1beta/models/<modelo>:generateContent`. O adapter converte os schemas Pydantic do DeepEval para o formato de schema nativo do Gemini, envia a chave no header `x-goog-api-key` e não inclui segredo na URL. Ele só é carregado durante a avaliação live explicitamente solicitada, nunca no caminho normal do chat.
+
+No Streamlit Community Cloud, configure `EVAL_JUDGE_API_KEY` (ou `GEMINI_API_KEY`) nos Secrets. A base recomendada é `https://generativelanguage.googleapis.com/v1beta`; sufixos `/openai` são removidos para evitar uma URL incompatível com a API nativa.
 - Golden Dataset: casos sintéticos versionados.
 - Relatórios: `output/evaluation/`.
 
@@ -76,7 +78,7 @@ For an explicit live judge run, which may consume LM/API credits:
 make evaluate-ai-live
 ```
 
-The live runner requires a configured judge LLM/embeddings adapter before it is expected to produce DeepEval/DeepEval scores; it is intentionally never called by pytest or the normal Streamlit path.
+The live runner requires a configured judge LLM before it is expected to produce DeepEval scores; it is intentionally never called by pytest or the normal Streamlit path.
 
 O modo padrão é offline e valida schema, rota, bloqueio e ferramentas esperadas.
 
@@ -91,6 +93,6 @@ As métricas DeepEval são:
 - `context_precision`;
 - `context_recall`.
 
-O adapter está em `src/evaluation_ai.py`. Para usar live, forneça um judge LLM/embeddings configurado e execute um runner explícito; o relatório deve registrar modelo, versão do prompt, dataset, métricas, custo e timestamp.
+O adapter está em `src/evaluation_ai.py`. Para usar live, forneça um judge LLM configurado e execute um runner explícito; o relatório deve registrar modelo, versão do prompt, dataset, métricas, custo e timestamp.
 
 Threshold inicial sugerido: `0.70` por métrica; abaixo disso é warning, abaixo de `0.50` é crítico. O judge é uma evidência de avaliação, não uma verdade absoluta.
