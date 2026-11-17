@@ -270,8 +270,10 @@ O SkillGraph continua sendo um MVP acadêmico. As principais limitações são:
 - não há autenticação corporativa ou RBAC real;
 - SQLite, logs e caches do Streamlit Cloud não são persistência empresarial;
 - OCR, JEV, Dify Cloud, Gemini e Langfuse dependem de configuração e quota;
+- a rota de currículo em PDF funciona no desenvolvimento local, mas a classificação de competências, níveis e senioridade pelo JEV ainda não está operacional no ambiente produtivo; a causa da incompatibilidade ou bloqueio entre os ambientes permanece em investigação;
 - guardrails determinísticos não garantem cobertura contra todos os ataques;
-- ainda faltam testes adversariais conduzidos por especialistas em segurança;
+- os testes atuais não constituem uma avaliação independente de segurança de aplicações nem de segurança específica de sistemas de IA;
+- ainda faltam testes adversariais conduzidos por especialistas de AppSec, Red Team e segurança de IA;
 - o corpus RAG precisa de documentos reais, atuais e autorizados;
 - o Golden Dataset precisa crescer com casos reais de RH e rotas multiagente;
 - não são aceitas imagens, planilhas e outros formatos de documentos de forma estruturada.
@@ -283,8 +285,14 @@ Próximas evoluções recomendadas:
 3. revisar o modelo com especialistas de RH, fairness e validação no contexto brasileiro;
 4. substituir ou complementar o corpus sintético por fontes institucionais reais;
 5. evoluir RAG com reranking, metadados, busca híbrida e detecção de ausência de evidência;
-6. modernizar a interface, adicionar streaming de status, entrada multimodal e mais formatos;
-7. executar testes de carga e avaliações independentes de segurança.
+6. investigar e corrigir a indisponibilidade produtiva do JEV, validando endpoint, credenciais, TLS, conectividade, quotas, schema e compatibilidade entre o ambiente local e o Streamlit Cloud com um currículo sintético;
+7. modernizar a interface, adicionar streaming de status, entrada multimodal e mais formatos;
+8. executar avaliação independente de segurança de aplicações e infraestrutura, incluindo threat modeling, upload, APIs, autenticação, autorização, dependências e abuso de recursos;
+9. executar avaliação adversarial de segurança de IA com profissionais de Red Team e especialistas em AppSec/AI security, cobrindo prompt injection direta e indireta, jailbreak, exfiltração de PII e secrets, abuso de ferramentas, manipulação de contexto, obfuscação e bypass de guardrails, incorporando correções e retestes ao Golden Dataset.
+
+A disponibilidade da rota de currículo em produção só deve ser declarada depois de um teste ponta a ponta que confirme a extração/OCR, o envio sanitizado ao JEV, a classificação de competências, níveis e senioridade, o tratamento de falhas e a paridade mínima entre os ambientes local e cloud.
+
+Os testes de segurança devem combinar segurança cibernética convencional — aplicação, infraestrutura, APIs, dados e dependências — com segurança específica de IA. Os resultados precisam registrar evidências, severidade, bloqueios, falsos positivos, correções e retestes; não devem ser tratados como certificação enquanto não houver avaliação independente e governança apropriada.
 
 ## 📚 Documentação
 

@@ -1,17 +1,79 @@
-# Golden dataset do SkillGraph
+# Golden Dataset do SkillGraph
 
-O Golden Dataset documenta e avalia as rotas atuais do SkillGraph, incluindo segurança, RAG, dados estruturados, treinamento, Machine Learning, esclarecimento e casos multi-turno. Os cenários compostos de agentes ficam em `agent_goldens.jsonl`; a avaliação semântica do RAG fica em `rag_goldens.jsonl`.
+O repositório contém três conjuntos versionados e reproduzíveis:
 
-As expectativas de rota devem acompanhar `src/agents/router.py`. O teste `tests/test_golden_dataset.py` executa o roteador real e falha quando uma entrada fica desatualizada.
+- `golden_dataset.jsonl`: 25 casos determinísticos de roteamento, guardrails, RAG, dados estruturados, ML, treinamento, esclarecimento e segurança;
+- `agent_goldens.jsonl`: 4 contratos de cenários multiagente, com agentes e ferramentas esperados;
+- `rag_goldens.jsonl`: 12 casos semânticos com pergunta, resposta de referência, contextos de referência, `ground_truth` e categoria.
 
-Para validar os datasets e as rotas atuais:
+As expectativas de rota devem acompanhar `src/agents/router.py`. Os testes executam o roteador e os guardrails reais e falham quando um dataset fica desatualizado.
+
+## Execução para avaliação local
+
+Use Python 3.11, a partir da raiz do repositório:
 
 ```bash
-pytest -q tests/test_golden_dataset.py tests/test_agent_goldens.py tests/test_intent_router.py tests/test_security.py tests/test_sql_tools.py
+python -m pip install -r requirements-dev.txt
+python -m pip check
+pytest -q tests
+python scripts/evaluate-ai.py --output /tmp/skillgraph-ai-quality-report.json
 ```
 
+A execução offline do Golden Dataset não precisa de chaves, Dify, Gemini ou JEV. Ela executa os 25 casos determinísticos contra o roteador/guardrails locais e grava um relatório no caminho informado.
 
-O arquivo `golden_dataset.jsonl` contém 25 casos versionados para avaliar as rotas do SkillGraph antes da demonstração. `agent_goldens.jsonl` acrescenta quatro cenários compostos de agentes; `rag_goldens.jsonl` contém doze casos com resposta, contexto e ground truth para a avaliação semântica opcional com DeepEval.
+Para validar especificamente os datasets e as rotas:
+
+```bash
+pytest -q tests/test_golden_dataset.py tests/test_agent_goldens.py tests/test_rag_cases.py
+```
+
+Os testes de integração do JEV usam mock e não enviam dados para a API. A rota real de currículo exige credenciais, serviço externo e currículo autorizado/sanitizado.
+
+## Avaliação RAG com DeepEval
+
+Os 12 casos de `rag_goldens.jsonl` podem ser avaliados semanticamente contra uma resposta e contextos atuais do Dify. Essa etapa não é offline: requer um Chatflow Dify acessível e um modelo judge Gemini configurado por Secrets ou variáveis de ambiente.
+
+Configure, por exemplo:
+
+```bash
+export DIFY_API_BASE_URL="https://..."
+export DIFY_API_KEY="..."
+export DIFY_USER_ID="professor-local"
+export EVAL_JUDGE_API_KEY="..."
+export EVAL_JUDGE_MODEL="gemini-3.1-flash-lite"
+export EVAL_JUDGE_BASE_URL="https://generativelanguage.googleapis.com/v1beta"
+```
+
+Execute somente após confirmar o consumo de quota:
+
+```bash
+python scripts/evaluate-ai-live.py \
+  --deepeval \
+  --yes-live \
+  --dataset evals/rag_goldens.jsonl \
+  --output /tmp/skillgraph-live-ai-report.json
+```
+
+O relatório live preserva por caso a pergunta, resposta avaliada, `ground_truth`, resposta/contextos de referência, fontes retornadas pelo Dify, quatro métricas, scores, thresholds, razões, modelo judge, estados de erro e cobertura. Score `0.0` é resultado válido; ausência de score indica erro ou execução incompleta.
+
+## Schema e critérios
+
+Cada caso determinístico contém `id`, `category`, `question`, `expected_route`, `expected_answer_facts`, `expected_documents`, `expected_ids`, `must_block` e `notes`.
+
+Cada caso RAG contém `id`, `question`, `answer`, `contexts`, `ground_truth` e `category`.
+
+Cada caso multiagente contém `id`, `category`, `question`, `expected_route`, `expected_agents`, `expected_tools`, `must_block`, `expected_answer_facts` e `notes`.
+
+Critérios principais:
+
+- rotas devem coincidir com `expected_route`;
+- casos `must_block` devem ser bloqueados antes de qualquer ferramenta ou LLM;
+- consultas SQL devem retornar dados agregados ou explicitamente solicitados;
+- RAG deve citar documentos somente quando houver evidência;
+- as respostas e contextos dos goldens RAG devem sustentar a `ground_truth`;
+- DeepEval avalia apenas a execução live e não substitui revisão humana.
+
+Os relatórios gerados em `output/evaluation/` são artefatos locais e não precisam ser commitados.
 
 ## Categorias
 

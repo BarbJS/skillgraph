@@ -98,6 +98,10 @@ O cliente JEV foi reforçado para:
 
 O JEV continua sendo uma etapa backend, não um agente autônomo. Seu resultado é complementar e é convertido em `EmployeeProfile` validado.
 
+No desenvolvimento local, o fluxo completo — currículo em PDF, extração textual/OCR, resumo sanitizado, envio ao JEV e classificação de competências, níveis e senioridade — foi validado com sucesso. No ambiente produtivo do Streamlit Cloud, entretanto, a interação com a API do JEV permanece indisponível ou bloqueada. A causa raiz ainda não foi confirmada e pode envolver diferenças de endpoint, credenciais, TLS, conectividade, quotas, schema de resposta ou compatibilidade entre plataformas. Portanto, a rota não deve ser considerada funcional em produção até que essa investigação seja concluída.
+
+O próximo passo é criar um diagnóstico reproduzível e sanitizado, usando currículo sintético e sem PII, que separe falhas de OCR, configuração, rede, autenticação, disponibilidade do provedor e validação de schema. Depois, a integração deve ser validada ponta a ponta em produção, com tratamento explícito de timeout e erro, observabilidade sem conteúdo sensível e critérios de aceite para a classificação retornada. A funcionalidade só deve ser apresentada como disponível após confirmação de paridade mínima entre o ambiente local e o cloud.
+
 ## 4. Gemini como sintetizador final
 
 ### 4.1 Motivo da mudança
@@ -490,19 +494,33 @@ A Etapa 3 melhora a segurança e a regressão, mas não afirma invulnerabilidade
 - casos RAG ainda são controlados e sintéticos;
 - PII ofuscada ou em imagens exige evolução de modelos especializados;
 - o ambiente não possui autenticação/RBAC real;
+- a rota de currículo com JEV foi validada localmente, mas permanece indisponível ou bloqueada no ambiente produtivo, sem causa raiz confirmada;
+- os testes existentes não constituem avaliação independente de segurança de aplicações, infraestrutura ou sistemas de IA;
 - integração futura de um scanner semântico deve ocorrer em processo isolado para não quebrar dependências;
 - custo e disponibilidade de APIs externas dependem dos provedores.
+
+Essa limitação do JEV impede afirmar que a classificação de competências, níveis e senioridade a partir de currículos em PDF esteja pronta para uso produtivo. O diagnóstico deve preservar o processamento temporário e sanitizado dos currículos e utilizar apenas dados sintéticos durante a investigação.
+
+Também é necessário distinguir segurança cibernética convencional — aplicação, infraestrutura, APIs, upload, autenticação, autorização, TLS e dependências — de segurança específica de IA, que inclui prompt injection direta e indireta, jailbreak, exfiltração de PII e secrets, abuso de ferramentas, manipulação de contexto, obfuscação e bypass de guardrails. Nenhuma dessas frentes pode ser considerada encerrada apenas com os testes automatizados atuais.
+
 
 ## 12. Próximos passos
 
 - expandir ataques sintéticos multilíngues e Unicode;
+- investigar a indisponibilidade produtiva do JEV, separando endpoint, credencial, TLS, conectividade, quota, schema e incompatibilidade entre plataformas;
+- validar em produção, com currículo sintético, a cadeia PDF → OCR → resumo sanitizado → JEV → competências, níveis e senioridade;
 - adicionar análise de documentos recuperados antes do LLM;
 - avaliar Presidio em ambiente separado para PII avançada;
 - versionar métricas de segurança por commit;
 - comparar relatórios entre versões do repositório;
 - ampliar casos RAG difíceis e contextos distratores;
 - criar testes de carga da camada de output;
+- realizar threat modeling e avaliação independente de AppSec/Red Team para aplicação, infraestrutura, APIs, upload, dependências e abuso de recursos;
+- realizar avaliação adversarial específica de segurança de IA com especialistas, cobrindo prompt injection, jailbreak, documentos maliciosos, exfiltração, abuso de ferramentas, obfuscação e bypass de guardrails;
+- incorporar achados, severidade, falsos positivos, correções e retestes ao Golden Dataset e ao processo de release;
 - revisar guardrails com especialistas de segurança e RH;
 - manter revisão humana antes de qualquer uso organizacional.
+
+A indisponibilidade produtiva do JEV e a ausência de uma avaliação adversarial independente são bloqueadores de maturidade operacional: o sistema pode continuar sendo demonstrado como protótipo, mas não deve ser apresentado como uma solução produtiva plenamente validada.
 
 A Etapa 3, neste início, é portanto uma etapa de confiabilidade: corrige integrações, torna avaliações executáveis contra o código atual, mede o uso real de APIs, centraliza a validação de respostas e registra explicitamente as limitações da segurança implementada.
